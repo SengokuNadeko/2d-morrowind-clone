@@ -1,6 +1,6 @@
-[gd_resource type="TileSet" load_steps=3 format=3 uid="uid://d3waia8merf64"]
+[gd_resource type="TileSet" format=3 uid="uid://d3waia8merf64"]
 
-[ext_resource type="Texture2D" uid="uid://b2qbub6m86l5l" path="res://ElvGames/Rogue Adventure/Tilesets/Sprites/RA_Village.png" id="1_soose"]
+[ext_resource type="Texture2D" uid="uid://b2qbub6m86l5l" path="res://scripts/player/ElvGames/Rogue Adventure/Tilesets/Sprites/RA_Village.png" id="1_soose"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_1pgne"]
 texture = ExtResource("1_soose")
@@ -176,7 +176,9 @@ texture = ExtResource("1_soose")
 5:9/0 = 0
 5:10/0 = 0
 5:11/0 = 0
+5:11/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -4, -7, -5, -5, -8, 8, -8, 8, 8, -8, 8)
 5:12/0 = 0
+5:12/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
 5:13/0 = 0
 5:14/0 = 0
 5:15/0 = 0
@@ -208,7 +210,9 @@ texture = ExtResource("1_soose")
 6:9/0 = 0
 6:10/0 = 0
 6:11/0 = 0
+6:11/0/physics_layer_0/polygon_0/points = PackedVector2Array(7, -4, 6, -5, 4, -8, -8, -8, -8, 8, 7, 8)
 6:12/0 = 0
+6:12/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
 6:13/0 = 0
 6:14/0 = 0
 6:15/0 = 0
@@ -1209,4 +1213,6 @@ texture = ExtResource("1_soose")
 24:40/0 = 0
 
 [resource]
+physics_layer_0/collision_layer = 1
+physics_layer_0/collision_mask = 2
 sources/0 = SubResource("TileSetAtlasSource_1pgne")

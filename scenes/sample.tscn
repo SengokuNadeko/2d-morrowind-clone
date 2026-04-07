@@ -2,7 +2,7 @@
 
 [ext_resource type="TileSet" uid="uid://bc34f446p3bhg" path="res://scripts/player/ElvGames/Rogue Adventure/Tilesets/RA_Grounds.tres" id="1_uxt5y"]
 [ext_resource type="PackedScene" uid="uid://ddm383btyb61v" path="res://scenes/player.tscn" id="2_dcudt"]
-[ext_resource type="TileSet" uid="uid://d3waia8merf64" path="res://ElvGames/Rogue Adventure/Tilesets/RA_Village.tres" id="2_mlm6t"]
+[ext_resource type="TileSet" uid="uid://d3waia8merf64" path="res://scripts/player/ElvGames/Rogue Adventure/Tilesets/RA_Village.tres" id="2_mlm6t"]
 
 [node name="Sample" type="Node2D" unique_id=833724449]
 
