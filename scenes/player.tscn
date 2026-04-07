@@ -234,7 +234,7 @@ script = ExtResource("1_fdfoy")
 sprite_frames = SubResource("SpriteFrames_dqkch")
 animation = &"idle_down"
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1742273520]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1742273520 groups=["enemy", "player"]]
 position = Vector2(0, 16)
 shape = SubResource("RectangleShape2D_qlg0r")
 
