@@ -2,11 +2,17 @@
 
 [ext_resource type="Script" uid="uid://bbxaepwipxnud" path="res://scripts/player/player.gd" id="1_fdfoy"]
 [ext_resource type="Texture2D" uid="uid://c0huw7mh2dqum" path="res://sprites/player/idle/left/1.png" id="1_g2els"]
+[ext_resource type="Texture2D" uid="uid://cd87fuxslthfb" path="res://sprites/player/hurt/up/1.png" id="2_lxlsd"]
 [ext_resource type="Texture2D" uid="uid://brtyfqbxjbmht" path="res://sprites/player/idle/left/2.png" id="2_qhqgy"]
 [ext_resource type="Texture2D" uid="uid://t87qpf7dptij" path="res://sprites/player/idle/down/1.png" id="3_giy8y"]
+[ext_resource type="Texture2D" uid="uid://dpt0pkam8frmf" path="res://sprites/player/hurt/up/2.png" id="3_ha2mi"]
+[ext_resource type="Texture2D" uid="uid://d0actmnn2oryq" path="res://sprites/player/hurt/up/3.png" id="4_apa73"]
 [ext_resource type="Texture2D" uid="uid://dlys6m5bis31i" path="res://sprites/player/idle/down/2.png" id="4_fdfoy"]
+[ext_resource type="Texture2D" uid="uid://b67007fgci0pu" path="res://sprites/player/hurt/up/4.png" id="5_74r1k"]
 [ext_resource type="Texture2D" uid="uid://ck2e6ldguka14" path="res://sprites/player/idle/right/1.png" id="5_hhpqf"]
+[ext_resource type="Texture2D" uid="uid://ds6b2ya7086ld" path="res://sprites/player/hurt/up/5.png" id="6_8svfe"]
 [ext_resource type="Texture2D" uid="uid://csgj3bkh75h2t" path="res://sprites/player/idle/right/2.png" id="6_g5jhy"]
+[ext_resource type="Texture2D" uid="uid://csgkphytaiw28" path="res://sprites/player/hurt/up/6.png" id="7_2a3c5"]
 [ext_resource type="Texture2D" uid="uid://c1owxxgqerskx" path="res://sprites/player/walk/left/1.png" id="7_holxr"]
 [ext_resource type="Texture2D" uid="uid://bnq14a3wdpa5d" path="res://sprites/player/idle/up/1.png" id="8_g5jhy"]
 [ext_resource type="Texture2D" uid="uid://t4pg7mpqpf1e" path="res://sprites/player/walk/left/2.png" id="8_mx1m4"]
@@ -46,9 +52,56 @@
 [ext_resource type="Texture2D" uid="uid://4uhqcsmpdn1v" path="res://sprites/player/walk/up/8.png" id="41_1da1t"]
 [ext_resource type="Texture2D" uid="uid://cy16vsq56fpya" path="res://sprites/player/walk/up/9.png" id="42_p21yu"]
 [ext_resource type="Script" uid="uid://b7mep1xj2e5wh" path="res://scripts/player/player_camera.gd" id="43_plcam"]
+[ext_resource type="Script" uid="uid://cobiqdph8y204" path="res://scripts/health_component.gd" id="47_mx1m4"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_dqkch"]
 animations = [{
+"frames": [{
+"duration": 1.5,
+"texture": ExtResource("2_lxlsd")
+}, {
+"duration": 1.5,
+"texture": ExtResource("3_ha2mi")
+}, {
+"duration": 1.5,
+"texture": ExtResource("4_apa73")
+}, {
+"duration": 1.5,
+"texture": ExtResource("5_74r1k")
+}, {
+"duration": 1.5,
+"texture": ExtResource("6_8svfe")
+}, {
+"duration": 1.5,
+"texture": ExtResource("7_2a3c5")
+}],
+"loop": false,
+"name": &"death",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 0.4,
+"texture": ExtResource("2_lxlsd")
+}, {
+"duration": 0.4,
+"texture": ExtResource("3_ha2mi")
+}, {
+"duration": 0.4,
+"texture": ExtResource("4_apa73")
+}, {
+"duration": 0.4,
+"texture": ExtResource("5_74r1k")
+}, {
+"duration": 0.4,
+"texture": ExtResource("6_8svfe")
+}, {
+"duration": 0.4,
+"texture": ExtResource("7_2a3c5")
+}],
+"loop": false,
+"name": &"hurt",
+"speed": 5.0
+}, {
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("1_g2els")
@@ -225,14 +278,17 @@ animations = [{
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_qlg0r"]
 size = Vector2(20, 32)
 
-[node name="Player" type="CharacterBody2D" unique_id=1702344883]
+[node name="Player" type="CharacterBody2D" unique_id=1702344883 node_paths=PackedStringArray("health_component") groups=["player"]]
 collision_layer = 2
 collision_mask = 5
 script = ExtResource("1_fdfoy")
+health_component = NodePath("HealthComponent")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1478909633]
 sprite_frames = SubResource("SpriteFrames_dqkch")
-animation = &"idle_down"
+animation = &"hurt"
+frame = 5
+frame_progress = 1.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1742273520 groups=["enemy", "player"]]
 position = Vector2(0, 16)
@@ -241,3 +297,6 @@ shape = SubResource("RectangleShape2D_qlg0r")
 [node name="Camera2D" type="Camera2D" parent="." unique_id=1949575423]
 zoom = Vector2(1.5, 1.5)
 script = ExtResource("43_plcam")
+
+[node name="HealthComponent" type="Node" parent="." unique_id=1151498701]
+script = ExtResource("47_mx1m4")
