@@ -405,9 +405,9 @@ health_component = NodePath("HealthComponent")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1478909633]
 sprite_frames = SubResource("SpriteFrames_dqkch")
-animation = &"slash_up"
+animation = &"idle_down"
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1742273520 groups=["enemy", "player"]]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1742273520]
 position = Vector2(0, 16)
 shape = SubResource("RectangleShape2D_qlg0r")
 
@@ -424,3 +424,7 @@ monitoring = false
 [node name="CollisionShape2D" type="CollisionShape2D" parent="MeleeHitbox" unique_id=243973579]
 shape = SubResource("RectangleShape2D_reqs7")
 debug_color = Color(1, 0, 0, 0.41960785)
+
+[node name="AttackCooldownTimer" type="Timer" parent="." unique_id=1497908536]
+wait_time = 0.8
+one_shot = true

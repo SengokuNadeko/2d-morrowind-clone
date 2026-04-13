@@ -3,6 +3,7 @@ extends CharacterBody2D
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var melee_hitbox: Area2D = $MeleeHitbox
 @onready var melee_hitbox_shape: CollisionShape2D = $MeleeHitbox/CollisionShape2D
+@onready var attack_cooldown_timer: Timer = $AttackCooldownTimer
 @export var health_component: Node
 
 var SPEED = 200.0
@@ -88,6 +89,8 @@ func update_animation() -> void:
 func player_attack():
 	if not Input.is_action_just_pressed("attack"):
 		return
+	if not attack_cooldown_timer.is_stopped():
+		return
 	var anim_name := String(animated_sprite.animation)
 	var suffix := ""
 	if anim_name.begins_with("idle_"):
@@ -118,6 +121,7 @@ func player_attack():
 		melee_hitbox_shape.position.y = -HITBOX_DISTANCE
 		print("Hitbox rotation: ", melee_hitbox_shape.rotation)
 	melee_hitbox.monitoring = true
+	attack_cooldown_timer.start()
 
 
 func _facing_suffix(dir: Vector2) -> String:
