@@ -1,11 +1,18 @@
 [gd_scene format=3 uid="uid://tpeluot4k8ma"]
 
+[ext_resource type="Script" uid="uid://k30vuesclbvc" path="res://scripts/enemy/enemy.gd" id="1_hyejq"]
 [ext_resource type="Texture2D" uid="uid://dhpvwstjfvjw2" path="res://sprites/enemy/idle/left/1.png" id="1_ya47j"]
+[ext_resource type="Texture2D" uid="uid://5rk0t36jtmdx" path="res://sprites/enemy/hurt/up/1.png" id="2_7w3jn"]
 [ext_resource type="Texture2D" uid="uid://mtqgiv1tqjam" path="res://sprites/enemy/idle/left/2.png" id="2_hyejq"]
 [ext_resource type="Texture2D" uid="uid://b1sh5myhowydx" path="res://sprites/enemy/idle/down/1.png" id="3_j0dkt"]
+[ext_resource type="Texture2D" uid="uid://c7rlaptmq0ypp" path="res://sprites/enemy/hurt/up/2.png" id="3_uiwvf"]
+[ext_resource type="Texture2D" uid="uid://c8ay67lcicm2w" path="res://sprites/enemy/hurt/up/3.png" id="4_0pw1s"]
 [ext_resource type="Texture2D" uid="uid://2wqnorxfliyi" path="res://sprites/enemy/idle/down/2.png" id="4_sdxul"]
+[ext_resource type="Texture2D" uid="uid://d2v78c5jx1jf3" path="res://sprites/enemy/hurt/up/4.png" id="5_b5geg"]
 [ext_resource type="Texture2D" uid="uid://bhig2tttrbrwx" path="res://sprites/enemy/idle/right/1.png" id="5_e7lhw"]
+[ext_resource type="Texture2D" uid="uid://btvqf5m5gi3l4" path="res://sprites/enemy/hurt/up/5.png" id="6_g0yyi"]
 [ext_resource type="Texture2D" uid="uid://ded6tdc68ak0t" path="res://sprites/enemy/idle/right/2.png" id="6_gst0f"]
+[ext_resource type="Texture2D" uid="uid://d1gp6siltjvwr" path="res://sprites/enemy/hurt/up/6.png" id="7_5utat"]
 [ext_resource type="Texture2D" uid="uid://d3jjdoawt36jd" path="res://sprites/enemy/idle/up/1.png" id="7_sm4rh"]
 [ext_resource type="Texture2D" uid="uid://qgktcbxecnlk" path="res://sprites/enemy/idle/up/2.png" id="8_5lniq"]
 [ext_resource type="Texture2D" uid="uid://dvy3unjjd8t15" path="res://sprites/enemy/walk/left/1.png" id="9_7w3jn"]
@@ -44,9 +51,56 @@
 [ext_resource type="Texture2D" uid="uid://ba63pfvj8ahxv" path="res://sprites/enemy/walk/up/7.png" id="42_y1ofb"]
 [ext_resource type="Texture2D" uid="uid://0jsclvcogn0e" path="res://sprites/enemy/walk/up/8.png" id="43_7jiuw"]
 [ext_resource type="Texture2D" uid="uid://dsixl1kcbrhyb" path="res://sprites/enemy/walk/up/9.png" id="44_v6etg"]
+[ext_resource type="Script" uid="uid://cobiqdph8y204" path="res://scripts/health_component.gd" id="46_j0dkt"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_c71we"]
 animations = [{
+"frames": [{
+"duration": 1.5,
+"texture": ExtResource("2_7w3jn")
+}, {
+"duration": 1.5,
+"texture": ExtResource("3_uiwvf")
+}, {
+"duration": 1.5,
+"texture": ExtResource("4_0pw1s")
+}, {
+"duration": 1.5,
+"texture": ExtResource("5_b5geg")
+}, {
+"duration": 1.5,
+"texture": ExtResource("6_g0yyi")
+}, {
+"duration": 1.5,
+"texture": ExtResource("7_5utat")
+}],
+"loop": false,
+"name": &"death",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 0.4,
+"texture": ExtResource("2_7w3jn")
+}, {
+"duration": 0.4,
+"texture": ExtResource("3_uiwvf")
+}, {
+"duration": 0.4,
+"texture": ExtResource("4_0pw1s")
+}, {
+"duration": 0.4,
+"texture": ExtResource("5_b5geg")
+}, {
+"duration": 0.4,
+"texture": ExtResource("6_g0yyi")
+}, {
+"duration": 0.4,
+"texture": ExtResource("7_5utat")
+}],
+"loop": false,
+"name": &"hurt",
+"speed": 5.0
+}, {
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("1_ya47j")
@@ -223,12 +277,26 @@ animations = [{
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_u4awx"]
 size = Vector2(20, 32)
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ya47j"]
+size = Vector2(30, 42)
+
 [node name="Enemy" type="CharacterBody2D" unique_id=1003581531 groups=["enemy"]]
+script = ExtResource("1_hyejq")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=649125916]
 sprite_frames = SubResource("SpriteFrames_c71we")
-animation = &"idle_down"
+animation = &"death"
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1792950307]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1792950307 groups=["enemy"]]
 position = Vector2(0, 16)
 shape = SubResource("RectangleShape2D_u4awx")
+
+[node name="HealthComponent" type="Node" parent="." unique_id=1055785237]
+script = ExtResource("46_j0dkt")
+
+[node name="Hurtbox" type="Area2D" parent="." unique_id=496626955]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox" unique_id=1078921838]
+position = Vector2(0, 11)
+shape = SubResource("RectangleShape2D_ya47j")
+debug_color = Color(0.7, 0, 0, 0.41960785)

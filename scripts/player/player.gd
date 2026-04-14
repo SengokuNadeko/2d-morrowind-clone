@@ -4,7 +4,7 @@ extends CharacterBody2D
 @onready var melee_hitbox: Area2D = $MeleeHitbox
 @onready var melee_hitbox_shape: CollisionShape2D = $MeleeHitbox/CollisionShape2D
 @onready var attack_cooldown_timer: Timer = $AttackCooldownTimer
-@export var health_component: Node
+@onready var health_component: Node = $HealthComponent
 
 var SPEED = 200.0
 var HITBOX_DISTANCE = 32.0
@@ -17,7 +17,10 @@ var is_dead: bool = false
 func _ready():
 	health_component.died.connect(_on_died)
 	health_component.hurt.connect(_on_hurt)
+	health_component.invulnerability_started.connect(_on_invulnerability_started)
+	health_component.invulnerability_ended.connect(_on_invulnerability_ended)
 	animated_sprite.animation_finished.connect(_on_animation_finished)
+	melee_hitbox.area_entered.connect(_on_melee_hitbox_area_entered)
 
 func _physics_process(_delta: float) -> void:
 	if is_dead:
@@ -82,7 +85,7 @@ func update_animation() -> void:
 	var moving := direction != Vector2.ZERO
 	var facing := direction if moving else last_direction
 	var anim := ("walk_" if moving else "idle_") + _facing_suffix(facing)
-	if animated_sprite.animation != anim:
+	if animated_sprite.animation != anim or not animated_sprite.is_playing():
 		animated_sprite.play(anim)
 
 
@@ -123,6 +126,14 @@ func player_attack():
 	melee_hitbox.monitoring = true
 	attack_cooldown_timer.start()
 
+func _on_melee_hitbox_area_entered(area: Area2D):
+	var enemy = area.get_parent()
+	if not enemy or not enemy.is_in_group("enemy"):
+		return
+	
+	var health = enemy.get_node_or_null("HealthComponent")
+	if health and health.has_method("take_damage"):
+		health.take_damage(10)
 
 func _facing_suffix(dir: Vector2) -> String:
 	if dir.length_squared() == 0.0:
@@ -154,3 +165,9 @@ func _on_hurt():
 func _on_died():
 	is_dead = true
 	animated_sprite.play("death")
+
+func _on_invulnerability_started():
+	print("Player invulnerability started")
+
+func _on_invulnerability_ended():
+	print("Player invulnerability ended")

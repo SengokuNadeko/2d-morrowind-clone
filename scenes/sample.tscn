@@ -3,6 +3,7 @@
 [ext_resource type="TileSet" uid="uid://bc34f446p3bhg" path="res://scripts/player/ElvGames/Rogue Adventure/Tilesets/RA_Grounds.tres" id="1_mlm6t"]
 [ext_resource type="PackedScene" uid="uid://ddm383btyb61v" path="res://scenes/player.tscn" id="2_dcudt"]
 [ext_resource type="TileSet" uid="uid://d3waia8merf64" path="res://scripts/player/ElvGames/Rogue Adventure/Tilesets/RA_Village.tres" id="2_mlm6t"]
+[ext_resource type="PackedScene" uid="uid://tpeluot4k8ma" path="res://scenes/enemy.tscn" id="4_dvghh"]
 [ext_resource type="PackedScene" uid="uid://6ntn5uk7l0oq" path="res://scenes/hud.tscn" id="4_tlvjm"]
 
 [node name="Sample" type="Node2D" unique_id=833724449]
@@ -19,6 +20,9 @@ tile_set = ExtResource("2_mlm6t")
 
 [node name="Player" parent="." unique_id=1702344883 instance=ExtResource("2_dcudt")]
 position = Vector2(576, 373)
+
+[node name="Enemy" parent="." unique_id=1003581531 instance=ExtResource("4_dvghh")]
+position = Vector2(441, 372)
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1192879223]
 
