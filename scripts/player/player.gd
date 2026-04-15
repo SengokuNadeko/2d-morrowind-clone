@@ -36,6 +36,9 @@ func _physics_process(_delta: float) -> void:
 	if get_slide_collision_count() > 0:
 		var collision := get_slide_collision(0)
 		print("Hit: ", collision.get_collider().name)
+	
+	if not attack_cooldown_timer.is_stopped():
+		print("Attack cooldown: ", attack_cooldown_timer.time_left)
 
 
 #Player movement function
@@ -124,6 +127,9 @@ func player_attack():
 		melee_hitbox_shape.position.y = -HITBOX_DISTANCE
 		print("Hitbox rotation: ", melee_hitbox_shape.rotation)
 	melee_hitbox.monitoring = true
+	
+	var duration := _get_animation_duration("slash_" + suffix)
+	attack_cooldown_timer.wait_time = max(duration, 0.01)
 	attack_cooldown_timer.start()
 
 func _on_melee_hitbox_area_entered(area: Area2D):
@@ -171,3 +177,22 @@ func _on_invulnerability_started():
 
 func _on_invulnerability_ended():
 	print("Player invulnerability ended")
+
+func _get_animation_duration(anim_name: String) -> float:
+	var frames := animated_sprite.sprite_frames
+	if frames == null or not frames.has_animation(anim_name):
+		return 0.0
+	
+	var frame_count := frames.get_frame_count(anim_name)
+	if frame_count <= 0:
+		return 0.0
+	
+	var total := 0.0
+	for i in frame_count:
+		total += frames.get_frame_duration(anim_name, i)
+	
+	var fps := frames.get_animation_speed(anim_name)
+	if fps <= 0.0:
+		return 0.0
+	
+	return total / (fps * max(animated_sprite.speed_scale, 0.001))
