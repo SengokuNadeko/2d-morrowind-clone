@@ -3,11 +3,30 @@ extends CharacterBody2D
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var health_component: Node = $HealthComponent
 
+enum State {
+	IDLE,
+	PATROL,
+	CHASE,
+	ATTACK,
+	DEAD,
+}
+
+var state: State = State.PATROL
 var is_dead: bool = false
 var last_direction: Vector2 = Vector2.DOWN
 var direction: Vector2 = Vector2.ZERO
 
+var patrol_origin: Vector2
+var patrol_direction: Vector2 = Vector2.DOWN
+var patrol_wait_timer: float = 0.0
+
+@export var patrol_speed: float = 60.0
+@export var patrol_distance: float = 64.0
+@export var patrol_wait_time: float = 1.0
+
 func _ready():
+	patrol_origin = global_position
+
 	health_component.died.connect(_on_died)
 	health_component.hurt.connect(_on_hurt)
 	health_component.invulnerability_started.connect(_on_invulnerability_started)
@@ -16,6 +35,15 @@ func _ready():
 func _physics_process(_delta: float) -> void:
 	if is_dead:
 		return
+	
+	match state:
+		State.PATROL:
+			_update_patrol(_delta)
+		State.IDLE:
+			_update_idle(_delta)
+	
+	if direction:
+		last_direction = direction
 
 	update_animation()
 
@@ -50,9 +78,32 @@ func _facing_suffix(dir: Vector2) -> String:
 		return "down" if dir.y > 0.0 else "up"
 	return "down" if dir.y > 0.0 else "up"
 
+func _update_patrol(delta: float) -> void:
+	if patrol_wait_timer > 0.0:
+		patrol_wait_timer -= delta
+		velocity = Vector2.ZERO
+		return
+	
+	velocity = patrol_direction * patrol_speed
+	direction = patrol_direction
+	move_and_slide()
+
+	var offset := global_position - patrol_origin
+	if offset.length() >= patrol_distance:
+		patrol_direction = -patrol_direction
+		patrol_wait_timer = patrol_wait_time
+		state = State.IDLE
+
+func _update_idle(delta: float) -> void:
+	if patrol_wait_timer <= 0.0:
+		state = State.PATROL
+		return
+	
+	direction = Vector2.ZERO
+	patrol_wait_timer -= delta
+
 func _on_hurt():
 	animated_sprite.play("hurt")
-
 
 func _on_died():
 	is_dead = true
