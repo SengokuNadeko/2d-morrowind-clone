@@ -6,6 +6,8 @@
 [ext_resource type="PackedScene" uid="uid://tpeluot4k8ma" path="res://scenes/enemy.tscn" id="4_dvghh"]
 [ext_resource type="PackedScene" uid="uid://6ntn5uk7l0oq" path="res://scenes/hud.tscn" id="4_tlvjm"]
 
+[sub_resource type="NavigationPolygon" id="NavigationPolygon_dvghh"]
+
 [node name="Sample" type="Node2D" unique_id=833724449]
 
 [node name="Ground" type="TileMapLayer" parent="." unique_id=1789916587]
@@ -27,3 +29,20 @@ position = Vector2(441, 372)
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1192879223]
 
 [node name="HUD" parent="CanvasLayer" unique_id=163114509 instance=ExtResource("4_tlvjm")]
+
+[node name="NavigationRegion2D" type="NavigationRegion2D" parent="." unique_id=902670742]
+navigation_polygon = SubResource("NavigationPolygon_dvghh")
+
+[node name="PatrolRoute1" type="Node2D" parent="." unique_id=1646158196]
+
+[node name="A" type="Marker2D" parent="PatrolRoute1" unique_id=424660621]
+position = Vector2(441, 174)
+
+[node name="B" type="Marker2D" parent="PatrolRoute1" unique_id=1569663107]
+position = Vector2(257.345, 174)
+
+[node name="C" type="Marker2D" parent="PatrolRoute1" unique_id=504168559]
+position = Vector2(257.345, 341.665)
+
+[node name="D" type="Marker2D" parent="PatrolRoute1" unique_id=104668857]
+position = Vector2(441, 341.665)

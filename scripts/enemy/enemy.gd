@@ -2,6 +2,7 @@ extends CharacterBody2D
 
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var health_component: Node = $HealthComponent
+@onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 
 enum State {
 	IDLE,
@@ -20,9 +21,17 @@ var patrol_origin: Vector2
 var patrol_direction: Vector2 = Vector2.DOWN
 var patrol_wait_timer: float = 0.0
 
+var patrol_points: Array[Marker2D] = []
+var patrol_index: int = 0
+
 @export var patrol_speed: float = 60.0
 @export var patrol_distance: float = 64.0
 @export var patrol_wait_time: float = 1.0
+
+@export var patrol_route_path: NodePath
+@export var patrol_route_name: String = "PatrolRoute1"
+@export var waypoint_reach_distance := 8.0
+@export var patrol_mode_loop := true #may make enum later
 
 func _ready():
 	patrol_origin = global_position
