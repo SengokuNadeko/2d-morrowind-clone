@@ -29,6 +29,9 @@ const ATTACK_ACTIVE_FRAMES := {
 }
 
 func _ready():
+	#Automatically add to player group
+	add_to_group("player")
+
 	health_component.died.connect(_on_died)
 	health_component.hurt.connect(_on_hurt)
 	health_component.invulnerability_started.connect(_on_invulnerability_started)

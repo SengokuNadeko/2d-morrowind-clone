@@ -12,13 +12,24 @@ enum State {
 	DEAD,
 }
 
+var _player: CharacterBody2D = null
+
+# Spawn position used for leash_radius (return to patrol if dragged too far from “home”).
+var _leash_origin: Vector2 = Vector2.ZERO
+
+# While chasing: counts down only when the player is outside lose_radius (with optional LOS).
+# When it hits zero, we give up and resume the patrol route.
+var _chase_interest_timer: float = 0.0
+
 var state: State = State.PATROL
 var is_dead: bool = false
 var last_direction: Vector2 = Vector2.DOWN
 var direction: Vector2 = Vector2.ZERO
 
+# Seconds left standing at a waypoint before moving to the next.
 var patrol_wait_timer: float = 0.0
 
+# Marker2D children of the map’s patrol route node, in visit order.
 var patrol_points: Array[Marker2D] = []
 var patrol_index: int = 0
 ## +1 forward through waypoints, -1 backward (used when patrol_mode_loop is false).
@@ -26,6 +37,15 @@ var _patrol_ping_step: int = 1
 
 @export var patrol_speed: float = 60.0
 @export var patrol_wait_time: float = 1.0
+
+@export var detection_radius: float = 100.0
+@export var lose_radius: float = 200.0
+@export var chase_memory_seconds: float = 2.0
+@export var chase_speed: float = 100.0
+## 0 = no leash. When > 0, chase ends if the enemy moves farther than this from _leash_origin (set once at spawn).
+## If this is small and the patrol route walks the enemy away from spawn, chase will instantly cancel every frame.
+@export var leash_radius: float = 0.0
+@export var use_line_of_sight: bool = false
 
 ## Assign in the editor to the map’s route node (e.g. PatrolRoute1). If empty, falls back to patrol_route_name under the parent.
 @export var patrol_route_path: NodePath
@@ -35,6 +55,13 @@ var _patrol_ping_step: int = 1
 @export var patrol_mode_loop := true
 
 func _ready() -> void:
+	# Capture after the node is in the tree so global_position matches the placed enemy.
+	_leash_origin = global_position
+
+	if _player == null or not is_instance_valid(_player):
+		_resolve_player()
+
+	# Always wire health first so enemies with no route still react to damage/death.
 	health_component.died.connect(_on_died)
 	health_component.hurt.connect(_on_hurt)
 	health_component.invulnerability_started.connect(_on_invulnerability_started)
@@ -57,9 +84,11 @@ func _ready() -> void:
 
 	_patrol_ping_step = 1
 	patrol_index = clampi(patrol_index, 0, patrol_points.size() - 1)
+	# Navigation mesh may not be ready on the same frame as _ready; defer avoids a bad first path.
 	call_deferred("_refresh_nav_target_to_current_waypoint")
 
 
+# Editor path wins; otherwise look for patrol_route_name on the same parent as this enemy (typical map layout).
 func _resolve_patrol_route() -> Node2D:
 	if patrol_route_path != NodePath():
 		var n := get_node_or_null(patrol_route_path)
@@ -73,6 +102,7 @@ func _resolve_patrol_route() -> Node2D:
 	return null
 
 
+# NavigationAgent2D expects a global point on the baked nav region.
 func _refresh_nav_target_to_current_waypoint() -> void:
 	if patrol_points.is_empty():
 		return
@@ -80,6 +110,7 @@ func _refresh_nav_target_to_current_waypoint() -> void:
 	nav_agent.target_position = patrol_points[patrol_index].global_position
 
 
+# Called after finishing the wait at a waypoint (see _update_idle). Updates patrol_index only; target is set separately.
 func _advance_patrol_index() -> void:
 	if patrol_points.is_empty():
 		return
@@ -105,11 +136,22 @@ func _physics_process(_delta: float) -> void:
 	if is_dead:
 		return
 
+	# State machine: patrol/idle can switch into CHASE when perception fires; CHASE/ATTACK run their own tick.
 	match state:
 		State.PATROL:
-			_update_patrol(_delta)
+			# Spot the player even while walking the route (not only when standing at a waypoint).
+			_try_enter_chase_from_patrol()
+			if state == State.PATROL:
+				_update_patrol(_delta)
 		State.IDLE:
-			_update_idle(_delta)
+			# Same as patrol: standing at a waypoint should not make the enemy “blind”.
+			_try_enter_chase_from_patrol()
+			if state == State.IDLE:
+				_update_idle(_delta)
+		State.CHASE:
+			_update_chase(_delta)
+		State.ATTACK:
+			_update_attack(_delta)
 
 	if direction:
 		last_direction = direction
@@ -151,24 +193,28 @@ func _facing_suffix(dir: Vector2) -> String:
 	return "down" if dir.y > 0.0 else "up"
 
 
+# Follow NavigationAgent2D’s path toward the current waypoint; pause at waypoints via IDLE + patrol_wait_timer.
 func _update_patrol(delta: float) -> void:
 	if patrol_points.is_empty():
 		velocity = Vector2.ZERO
 		direction = Vector2.ZERO
 		return
 
+	# Still counting down the stand-still at this waypoint (timer was set when we entered IDLE from patrol).
 	if patrol_wait_timer > 0.0:
 		patrol_wait_timer -= delta
 		velocity = Vector2.ZERO
 		direction = Vector2.ZERO
 		return
 
+	# Steer toward the next baked path corner; avoids static obstacles per NavigationRegion2D.
 	var next_pos := nav_agent.get_next_path_position()
 	var to_next := next_pos - global_position
 	var dir := Vector2.ZERO
 	if to_next.length_squared() > 0.0001:
 		dir = to_next.normalized()
 	else:
+		# Agent can report “next” == self when path is empty or not updated yet; nudge toward the marker.
 		var to_wp := patrol_points[patrol_index].global_position - global_position
 		if to_wp.length_squared() > 0.0001:
 			dir = to_wp.normalized()
@@ -177,6 +223,7 @@ func _update_patrol(delta: float) -> void:
 	velocity = dir * patrol_speed
 	move_and_slide()
 
+	# Close enough to this waypoint: stop moving and hand off to IDLE (actual index bump happens after the wait).
 	if global_position.distance_to(patrol_points[patrol_index].global_position) <= waypoint_reach_distance:
 		patrol_wait_timer = patrol_wait_time
 		state = State.IDLE
@@ -190,9 +237,116 @@ func _update_idle(delta: float) -> void:
 		patrol_wait_timer -= delta
 		return
 
+	# Wait finished: pick next waypoint, tell the nav agent, resume walking.
 	_advance_patrol_index()
 	_refresh_nav_target_to_current_waypoint()
 	state = State.PATROL
+
+
+# If the player is close enough (and optional LOS passes), interrupt patrol/idle and start chasing.
+func _try_enter_chase_from_patrol() -> void:
+	if _player == null or not is_instance_valid(_player):
+		_resolve_player()
+	if _player == null or not is_instance_valid(_player):
+		return
+
+	var dist_sq := global_position.distance_squared_to(_player.global_position)
+	if dist_sq > detection_radius * detection_radius:
+		return
+
+	if use_line_of_sight and not _has_line_of_sight_to_player():
+		return
+
+	state = State.CHASE
+	# Full “interest” when we first commit to chase; _update_chase will refresh while the player stays in range.
+	_chase_interest_timer = chase_memory_seconds if chase_memory_seconds > 0.0 else INF
+
+
+# Drive NavigationAgent2D toward the player each tick; same steering pattern as patrol but at chase_speed.
+func _update_chase(delta: float) -> void:
+	if _player == null or not is_instance_valid(_player):
+		_resolve_player()
+	if _player == null or not is_instance_valid(_player):
+		_return_to_patrol()
+		return
+
+	# Leash: stop pursuing if kited too far from where the enemy started (prevents map-wide chases).
+	# leash_radius <= 0 disables this check — a small positive radius while patrolling far from spawn causes
+	# chase to end on the first physics tick (flip-flop PATROL/CHASE) because _leash_origin never moves.
+	if leash_radius > 0.0 and global_position.distance_squared_to(_leash_origin) > leash_radius * leash_radius:
+		_return_to_patrol()
+		return
+
+	# Keep the baked path updated toward the moving player.
+	nav_agent.target_position = _player.global_position
+
+	var next_pos := nav_agent.get_next_path_position()
+	var to_next := next_pos - global_position
+	var dir := Vector2.ZERO
+	if to_next.length_squared() > 0.0001:
+		dir = to_next.normalized()
+	else:
+		var to_player := _player.global_position - global_position
+		if to_player.length_squared() > 0.0001:
+			dir = to_player.normalized()
+
+	direction = dir
+	velocity = dir * chase_speed
+	move_and_slide()
+
+	# Hysteresis + memory: stay committed while inside lose_radius (and LOS if enabled); otherwise drain interest.
+	var in_lose := global_position.distance_squared_to(_player.global_position) <= lose_radius * lose_radius
+	if use_line_of_sight:
+		in_lose = in_lose and _has_line_of_sight_to_player()
+
+	if in_lose:
+		# chase_memory_seconds == 0 means “no grace after leaving lose_radius”, not “give up while still in range”.
+		_chase_interest_timer = chase_memory_seconds if chase_memory_seconds > 0.0 else INF
+	else:
+		_chase_interest_timer -= delta
+
+	if _chase_interest_timer <= 0.0:
+		_return_to_patrol()
+
+
+# Placeholder for future melee/ranged: enter from CHASE when in attack range, play swing, then pop back to CHASE or patrol.
+func _update_attack(_delta: float) -> void:
+	pass
+
+
+# Resume the patrol route from the current waypoint (or keep waiting if we interrupted a waypoint pause).
+func _return_to_patrol() -> void:
+	if patrol_points.is_empty():
+		state = State.IDLE
+		return
+
+	_refresh_nav_target_to_current_waypoint()
+	if patrol_wait_timer > 0.0:
+		state = State.IDLE
+	else:
+		state = State.PATROL
+
+
+func _has_line_of_sight_to_player() -> bool:
+	if _player == null or not is_instance_valid(_player):
+		return false
+	var space := get_world_2d().direct_space_state
+	var q := PhysicsRayQueryParameters2D.create(global_position, _player.global_position)
+	q.exclude = [get_rid()]
+	q.collide_with_areas = true
+	q.collide_with_bodies = true
+	var hit := space.intersect_ray(q)
+	if hit.is_empty():
+		return true
+	return hit.get("collider", null) == _player
+
+
+func _resolve_player() -> void:
+	_player = get_tree().get_first_node_in_group("player")
+	if _player != null and is_instance_valid(_player):
+		print("Player found: ", _player.name)
+	else:
+		print("Player not found")
 
 
 func _on_hurt():
