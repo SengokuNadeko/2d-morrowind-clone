@@ -36,6 +36,8 @@ var patrol_index: int = 0
 ## +1 forward through waypoints, -1 backward (used when patrol_mode_loop is false).
 var _patrol_ping_step: int = 1
 
+@export var debug_mode: bool = false
+
 @export var patrol_speed: float = 60.0
 @export var patrol_wait_time: float = 1.0
 
@@ -60,6 +62,11 @@ var _patrol_ping_step: int = 1
 @export var patrol_mode_loop := true
 
 func _ready() -> void:
+	if debug_mode:
+		debug_vision.visible = true
+	else:
+		debug_vision.visible = false
+
 	# Capture after the node is in the tree so global_position matches the placed enemy.
 	_leash_origin = global_position
 
