@@ -3,6 +3,7 @@ extends CharacterBody2D
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var health_component: Node = $HealthComponent
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
+@onready var debug_vision: Node2D = $DebugVision
 
 enum State {
 	IDLE,
@@ -46,6 +47,10 @@ var _patrol_ping_step: int = 1
 ## If this is small and the patrol route walks the enemy away from spawn, chase will instantly cancel every frame.
 @export var leash_radius: float = 0.0
 @export var use_line_of_sight: bool = false
+## Max distance used by LOS cone checks (separate from detection/lose radii).
+@export var line_of_sight_radius: float = 220.0
+## Total cone angle in degrees (e.g. 90 means 45 degrees left and right of facing).
+@export var line_of_sight_fov_degrees: float = 90.0
 
 ## Assign in the editor to the map’s route node (e.g. PatrolRoute1). If empty, falls back to patrol_route_name under the parent.
 @export var patrol_route_path: NodePath
@@ -156,6 +161,11 @@ func _physics_process(_delta: float) -> void:
 	if direction:
 		last_direction = direction
 
+	# Keep debug cone aligned in every state, not only while patrolling.
+	if debug_vision != null:
+		var facing := direction if direction != Vector2.ZERO else last_direction
+		debug_vision.rotation = facing.angle()
+
 	update_animation()
 
 
@@ -250,12 +260,16 @@ func _try_enter_chase_from_patrol() -> void:
 	if _player == null or not is_instance_valid(_player):
 		return
 
-	var dist_sq := global_position.distance_squared_to(_player.global_position)
-	if dist_sq > detection_radius * detection_radius:
-		return
-
-	if use_line_of_sight and not _has_line_of_sight_to_player():
-		return
+	# Patrol entry perception:
+	# - LOS off: keep the original radial detection behavior.
+	# - LOS on: require cone + LOS raycast using line_of_sight_* exports.
+	if use_line_of_sight:
+		if not _can_see_player_in_cone(line_of_sight_radius):
+			return
+	else:
+		var dist_sq := global_position.distance_squared_to(_player.global_position)
+		if dist_sq > detection_radius * detection_radius:
+			return
 
 	state = State.CHASE
 	# Full “interest” when we first commit to chase; _update_chase will refresh while the player stays in range.
@@ -294,10 +308,16 @@ func _update_chase(delta: float) -> void:
 	velocity = dir * chase_speed
 	move_and_slide()
 
-	# Hysteresis + memory: stay committed while inside lose_radius (and LOS if enabled); otherwise drain interest.
-	var in_lose := global_position.distance_squared_to(_player.global_position) <= lose_radius * lose_radius
+	# Hysteresis + memory: stay committed while perception still says “valid target”.
+	# LOS off: keep the original lose_radius behavior.
+	# LOS on: keep LOS requirement and use a cone radius at least as large as lose_radius so retention
+	# does not become stricter than your de-aggro radius tuning.
+	var in_lose := false
 	if use_line_of_sight:
-		in_lose = in_lose and _has_line_of_sight_to_player()
+		var los_keep_radius := maxf(lose_radius, line_of_sight_radius)
+		in_lose = _can_see_player_in_cone(los_keep_radius)
+	else:
+		in_lose = global_position.distance_squared_to(_player.global_position) <= lose_radius * lose_radius
 
 	if in_lose:
 		# chase_memory_seconds == 0 means “no grace after leaving lose_radius”, not “give up while still in range”.
@@ -333,12 +353,52 @@ func _has_line_of_sight_to_player() -> bool:
 	var space := get_world_2d().direct_space_state
 	var q := PhysicsRayQueryParameters2D.create(global_position, _player.global_position)
 	q.exclude = [get_rid()]
-	q.collide_with_areas = true
+	# Ignore Areas for LOS so player/enemy hitboxes don't falsely block vision.
+	q.collide_with_areas = false
 	q.collide_with_bodies = true
 	var hit := space.intersect_ray(q)
 	if hit.is_empty():
 		return true
-	return hit.get("collider", null) == _player
+	var collider: Object = hit.get("collider", null)
+	# Accept direct player body or child colliders that belong to the player.
+	if collider == _player:
+		return true
+	if collider is Node:
+		var n := collider as Node
+		if n.is_in_group("player"):
+			return true
+		if n.get_parent() == _player:
+			return true
+	return false
+
+
+# Cone + radius + occlusion test used when use_line_of_sight is enabled.
+# The enemy's "forward" is the current movement direction; when idle, it falls back to last_direction.
+func _can_see_player_in_cone(radius: float) -> bool:
+	if _player == null or not is_instance_valid(_player):
+		return false
+	if radius <= 0.0:
+		return false
+
+	var to_player := _player.global_position - global_position
+	if to_player.length_squared() > radius * radius:
+		return false
+
+	# Use movement direction as the facing vector; fallback keeps a stable cone while standing still.
+	var facing := direction if direction.length_squared() > 0.0 else last_direction
+	if facing.length_squared() == 0.0:
+		facing = Vector2.DOWN
+	facing = facing.normalized()
+
+	var dir_to_player := to_player.normalized()
+	var half_fov_rad := deg_to_rad(clampf(line_of_sight_fov_degrees, 0.0, 360.0) * 0.5)
+	var min_dot := cos(half_fov_rad)
+	# Dot product compares angle cheaply: 1.0 = directly ahead, 0.0 = 90 degrees, -1.0 = behind.
+	if facing.dot(dir_to_player) < min_dot:
+		return false
+
+	# Final check: even inside the cone, a wall should block sight.
+	return _has_line_of_sight_to_player()
 
 
 func _resolve_player() -> void:

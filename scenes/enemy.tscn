@@ -52,6 +52,7 @@
 [ext_resource type="Texture2D" uid="uid://0jsclvcogn0e" path="res://sprites/enemy/walk/up/8.png" id="43_7jiuw"]
 [ext_resource type="Texture2D" uid="uid://dsixl1kcbrhyb" path="res://sprites/enemy/walk/up/9.png" id="44_v6etg"]
 [ext_resource type="Script" uid="uid://cobiqdph8y204" path="res://scripts/health_component.gd" id="46_j0dkt"]
+[ext_resource type="Script" uid="uid://cclj2jppi24rp" path="res://scripts/debug/debug_vision.gd" id="53_uiwvf"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_c71we"]
 animations = [{
@@ -302,3 +303,6 @@ shape = SubResource("RectangleShape2D_ya47j")
 debug_color = Color(0.7, 0, 0, 0.41960785)
 
 [node name="NavigationAgent2D" type="NavigationAgent2D" parent="." unique_id=1379102984]
+
+[node name="DebugVision" type="Node2D" parent="." unique_id=1673021127]
+script = ExtResource("53_uiwvf")
