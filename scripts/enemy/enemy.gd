@@ -61,6 +61,18 @@ var _patrol_ping_step: int = 1
 ## true: A→B→C→D→A…  false: A→B→C→D→C→B→A…
 @export var patrol_mode_loop := true
 
+#Suspicion export vars
+@export var suspicion_max := 100.0
+@export var suspicion_decay_per_sec := 8.0
+@export var suspicion_gain_far_per_sec := 8.0
+@export var suspicion_gain_near_per_sec := 40.0
+@export var near_distance := 32.0
+@export var damage_suspicion_bonus := 45.0
+@export var instant_chase_on_damage := false
+
+#Suspicion runtime var
+var _suspicion: float = 0.0
+
 func _ready() -> void:
 	if debug_mode:
 		debug_vision.visible = true
@@ -152,12 +164,12 @@ func _physics_process(_delta: float) -> void:
 	match state:
 		State.PATROL:
 			# Spot the player even while walking the route (not only when standing at a waypoint).
-			_try_enter_chase_from_patrol()
+			_update_patrol_idle_perception(_delta)
 			if state == State.PATROL:
 				_update_patrol(_delta)
 		State.IDLE:
 			# Same as patrol: standing at a waypoint should not make the enemy “blind”.
-			_try_enter_chase_from_patrol()
+			_update_patrol_idle_perception(_delta)
 			if state == State.IDLE:
 				_update_idle(_delta)
 		State.CHASE:
@@ -222,7 +234,7 @@ func _update_patrol(delta: float) -> void:
 		patrol_wait_timer -= delta
 		velocity = Vector2.ZERO
 		direction = Vector2.ZERO
-		return
+		_refresh_nav_target_to_current_waypoint
 
 	# Steer toward the next baked path corner; avoids static obstacles per NavigationRegion2D.
 	var next_pos := nav_agent.get_next_path_position()
@@ -259,29 +271,25 @@ func _update_idle(delta: float) -> void:
 	_refresh_nav_target_to_current_waypoint()
 	state = State.PATROL
 
-
-# If the player is close enough (and optional LOS passes), interrupt patrol/idle and start chasing.
-func _try_enter_chase_from_patrol() -> void:
+func _update_patrol_idle_perception(delta: float) -> void:
 	if _player == null or not is_instance_valid(_player):
 		_resolve_player()
 	if _player == null or not is_instance_valid(_player):
 		return
-
-	# Patrol entry perception:
-	# - LOS off: keep the original radial detection behavior.
-	# - LOS on: require cone + LOS raycast using line_of_sight_* exports.
-	if use_line_of_sight:
-		if not _can_see_player_in_cone(line_of_sight_radius):
-			return
+	
+	var detectable := _is_player_detectable()
+	if detectable:
+		var dist := global_position.distance_to(_player.global_position)
+		var gain_rate := _suspicion_gain_rate_for_distance(dist)
+		_suspicion += gain_rate * delta
 	else:
-		var dist_sq := global_position.distance_squared_to(_player.global_position)
-		if dist_sq > detection_radius * detection_radius:
-			return
+		_suspicion -= suspicion_decay_per_sec * delta
+	
+	_suspicion = clampf(_suspicion, 0.0, suspicion_max)
 
-	state = State.CHASE
-	# Full “interest” when we first commit to chase; _update_chase will refresh while the player stays in range.
-	_chase_interest_timer = chase_memory_seconds if chase_memory_seconds > 0.0 else INF
-
+	if _suspicion >= suspicion_max:
+		state = State.CHASE
+		_chase_interest_timer = chase_memory_seconds if chase_memory_seconds > 0.0 else INF
 
 # Drive NavigationAgent2D toward the player each tick; same steering pattern as patrol but at chase_speed.
 func _update_chase(delta: float) -> void:
@@ -415,6 +423,20 @@ func _resolve_player() -> void:
 	else:
 		print("Player not found")
 
+#Suspicion utility functions
+#Utility function to compute suspicion gain from distance
+func _suspicion_gain_rate_for_distance(distance: float) -> float:
+	var t := clampf(1.0 - (distance / detection_radius), 0.0, 1.0)
+	return lerpf(suspicion_gain_far_per_sec, suspicion_gain_near_per_sec, t)
+
+func _is_player_detectable() -> bool:
+	if _player == null or not is_instance_valid(_player):
+		_resolve_player()
+	if _player == null or not is_instance_valid(_player):
+		return false
+	if use_line_of_sight:
+		return _can_see_player_in_cone(line_of_sight_radius)
+	return global_position.distance_squared_to(_player.global_position) <= detection_radius * detection_radius
 
 func _on_hurt():
 	animated_sprite.play("hurt")
