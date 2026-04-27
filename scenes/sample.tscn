@@ -25,6 +25,7 @@ position = Vector2(576, 373)
 
 [node name="Enemy" parent="." unique_id=1003581531 instance=ExtResource("4_dvghh")]
 position = Vector2(441, 372)
+debug_mode = true
 suspicion_gain_far_per_sec = 20.0
 suspicion_gain_near_per_sec = 60.0
 

@@ -4,6 +4,7 @@ extends CharacterBody2D
 @onready var health_component: Node = $HealthComponent
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 @onready var debug_vision: Node2D = $DebugVision
+@onready var suspicion_bar: ProgressBar = $SuspicionMeter
 
 enum State {
 	IDLE,
@@ -12,6 +13,9 @@ enum State {
 	ATTACK,
 	DEAD,
 }
+
+const SUSPICION_METER_SCENE := preload("res://scenes/suspicion_meter.tscn")
+var _suspicion_meter: Control
 
 var _player: CharacterBody2D = null
 
@@ -78,6 +82,10 @@ func _ready() -> void:
 		debug_vision.visible = true
 	else:
 		debug_vision.visible = false
+	
+	_suspicion_meter = SUSPICION_METER_SCENE.instantiate()
+	get_tree().current_scene.add_child(_suspicion_meter)
+	_suspicion_meter.target = self
 
 	# Capture after the node is in the tree so global_position matches the placed enemy.
 	_leash_origin = global_position
@@ -282,9 +290,11 @@ func _update_patrol_idle_perception(delta: float) -> void:
 		var dist := global_position.distance_to(_player.global_position)
 		var gain_rate := _suspicion_gain_rate_for_distance(dist)
 		_suspicion += gain_rate * delta
+		_suspicion_meter.set_percent(_suspicion / suspicion_max)
 	else:
 		_suspicion -= suspicion_decay_per_sec * delta
-	
+		_suspicion_meter.set_percent(_suspicion / suspicion_max)
+
 	_suspicion = clampf(_suspicion, 0.0, suspicion_max)
 
 	if _suspicion >= suspicion_max:
