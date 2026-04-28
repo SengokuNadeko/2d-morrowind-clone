@@ -7,10 +7,15 @@
 [node name="SuspicionMeter" type="Node2D" unique_id=2130068551]
 script = ExtResource("1_i8tqv")
 
-[node name="TextureProgressBar" type="TextureProgressBar" parent="." unique_id=120819667]
+[node name="TextureRect" type="TextureRect" parent="." unique_id=1304421308]
 offset_right = 32.0
 offset_bottom = 10.0
-value = 100.0
-texture_under = ExtResource("2_fnlw7")
+texture = ExtResource("2_fnlw7")
+
+[node name="ProgressBar" type="TextureProgressBar" parent="." unique_id=230113112]
+offset_left = 3.0
+offset_top = 3.0
+offset_right = 29.0
+offset_bottom = 6.0
+nine_patch_stretch = true
 texture_progress = ExtResource("3_u2lpj")
-texture_progress_offset = Vector2(2.99, 3)
