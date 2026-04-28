@@ -5,12 +5,22 @@ extends CharacterBody2D
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 @onready var debug_vision: Node2D = $DebugVision
 
+@onready var melee_hitbox: Area2D = $MeleeHitbox
+@onready var melee_hitbox_shape: CollisionShape2D = $MeleeHitbox/CollisionShape2D
+
 enum State {
 	IDLE,
 	PATROL,
 	CHASE,
 	ATTACK,
 	DEAD,
+}
+
+const ATTACK_ACTIVE_FRAMES := {
+	"slash_down": Vector2i(2,3),
+	"slash_left": Vector2i(2,3),
+	"slash_right": Vector2i(2,3),
+	"slash_up": Vector2i(2,3),
 }
 
 const SUSPICION_METER_SCENE := preload("res://scenes/suspicion_meter.tscn")
@@ -73,6 +83,17 @@ var _patrol_ping_step: int = 1
 @export var damage_suspicion_bonus := 45.0
 @export var instant_chase_on_damage := false
 
+#attack export vars
+@export var attack_range: float = 28.0
+@export var attack_damage: int = 10
+@export var attack_cooldown: float = 0.8
+@export var hitbox_distance: float = 22.0
+
+var attack_cooldown_left: float = 0.0
+var attack_hitbox_active: bool = false
+var attack_has_connected: bool = false
+var current_attack_anim: String = ""
+
 #Suspicion runtime var
 var _suspicion: float = 0.0
 
@@ -101,6 +122,13 @@ func _ready() -> void:
 	health_component.hurt.connect(_on_hurt)
 	health_component.invulnerability_started.connect(_on_invulnerability_started)
 	health_component.invulnerability_ended.connect(_on_invulnerability_ended)
+	
+	#wire attack signals
+	animated_sprite.animation_finished.connect(_on_animation_finished)
+	animated_sprite.frame_changed.connect(_on_attack_frame_changed)
+	melee_hitbox.area_entered.connect(_on_melee_hitbox_area_entered)
+	melee_hitbox.body_entered.connect(_on_melee_hitbox_body_entered)
+	melee_hitbox.monitoring = false
 
 	var route := _resolve_patrol_route()
 	patrol_points.clear()
@@ -170,6 +198,8 @@ func _advance_patrol_index() -> void:
 func _physics_process(_delta: float) -> void:
 	if is_dead:
 		return
+
+	attack_cooldown_left = maxf(attack_cooldown_left - _delta, 0.0)
 
 	# State machine: patrol/idle can switch into CHASE when perception fires; CHASE/ATTACK run their own tick.
 	match state:
@@ -312,7 +342,7 @@ func _update_chase(delta: float) -> void:
 	if _player == null or not is_instance_valid(_player):
 		_return_to_patrol()
 		return
-
+	
 	# Leash: stop pursuing if kited too far from where the enemy started (prevents map-wide chases).
 	# leash_radius <= 0 disables this check — a small positive radius while patrolling far from spawn causes
 	# chase to end on the first physics tick (flip-flop PATROL/CHASE) because _leash_origin never moves.
@@ -332,6 +362,12 @@ func _update_chase(delta: float) -> void:
 		var to_player := _player.global_position - global_position
 		if to_player.length_squared() > 0.0001:
 			dir = to_player.normalized()
+
+	# Enter attack when close enough and the cooldown is ready.
+	var to_player_now := _player.global_position - global_position
+	if _is_player_within_attack_trigger(to_player_now) and attack_cooldown_left <= 0.0:
+		_start_attack()
+		return
 
 	direction = dir
 	velocity = dir * chase_speed
@@ -357,10 +393,85 @@ func _update_chase(delta: float) -> void:
 	if _chase_interest_timer <= 0.0:
 		_return_to_patrol()
 
+func _start_attack() -> void:
+	state = State.ATTACK
+	velocity = Vector2.ZERO
+	direction = Vector2.ZERO
+
+	var to_player := _player.global_position - global_position
+	last_direction = _cardinal_from_vector(to_player)
+
+	var suffix := _facing_suffix(last_direction)
+	current_attack_anim = "slash_" + suffix
+	attack_has_connected = false
+	attack_hitbox_active = false
+	melee_hitbox.monitoring = false
+
+	_position_hitbox_for_suffix(suffix)
+	animated_sprite.play(current_attack_anim)
+	attack_cooldown_left = attack_cooldown
 
 # Placeholder for future melee/ranged: enter from CHASE when in attack range, play swing, then pop back to CHASE or patrol.
 func _update_attack(_delta: float) -> void:
-	pass
+	velocity = Vector2.ZERO
+	direction = Vector2.ZERO
+
+
+func _position_hitbox_for_suffix(suffix: String) -> void:
+	if suffix == "down":
+		melee_hitbox_shape.rotation_degrees = 0.0
+		melee_hitbox_shape.position.x = 0.0
+		melee_hitbox_shape.position.y = hitbox_distance
+	elif suffix == "left":
+		melee_hitbox_shape.rotation_degrees = 90.0
+		melee_hitbox_shape.position.x = -hitbox_distance
+		melee_hitbox_shape.position.y = 0.0
+	elif suffix == "right":
+		melee_hitbox_shape.rotation_degrees = 90.0
+		melee_hitbox_shape.position.x = hitbox_distance
+		melee_hitbox_shape.position.y = 0.0
+	elif suffix == "up":
+		melee_hitbox_shape.rotation_degrees = 0.0
+		melee_hitbox_shape.position.x = 0.0
+		melee_hitbox_shape.position.y = -hitbox_distance
+
+
+func _cardinal_from_vector(v: Vector2) -> Vector2:
+	if v.length_squared() == 0.0:
+		return last_direction if last_direction.length_squared() > 0.0 else Vector2.DOWN
+	if absf(v.x) > absf(v.y):
+		return Vector2(signf(v.x), 0.0)
+	return Vector2(0.0, signf(v.y))
+
+
+func _is_player_within_attack_trigger(to_player: Vector2) -> bool:
+	# Collider-aware axis check. Player and enemy body shapes are taller than wide,
+	# so north/south contact distance is larger than east/west.
+	# attack_range is treated as extra reach beyond body contact.
+	var body_half_w := 10.0
+	var body_half_h := 16.0
+
+	var contact_x := body_half_w + body_half_w
+	var contact_y := body_half_h + body_half_h
+
+	var trigger_x := contact_x + attack_range
+	var trigger_y := contact_y + attack_range
+
+	return absf(to_player.x) <= trigger_x and absf(to_player.y) <= trigger_y
+
+
+func _on_animation_finished() -> void:
+	var anim := String(animated_sprite.animation)
+	if not anim.begins_with("slash_"):
+		return
+
+	attack_hitbox_active = false
+	melee_hitbox.monitoring = false
+	current_attack_anim = ""
+
+	# Keep pressure when player stays nearby; otherwise resume chase pathing.
+	if state == State.ATTACK:
+		state = State.CHASE
 
 
 # Resume the patrol route from the current waypoint (or keep waiting if we interrupted a waypoint pause).
@@ -452,8 +563,89 @@ func _is_player_detectable() -> bool:
 		return _can_see_player_in_cone(line_of_sight_radius)
 	return global_position.distance_squared_to(_player.global_position) <= detection_radius * detection_radius
 
+func _on_attack_frame_changed() -> void:
+	var anim := String(animated_sprite.animation)
+	if not anim.begins_with("slash_"):
+		return
+	
+	var window: Vector2i = ATTACK_ACTIVE_FRAMES.get(anim, Vector2i(-1,-1))
+	var frame:= animated_sprite.frame
+	var should_be_active := frame >= window.x and frame <= window.y
+
+	if should_be_active != attack_hitbox_active:
+		attack_hitbox_active = should_be_active
+		melee_hitbox.monitoring = should_be_active
+		if should_be_active:
+			_try_apply_damage_from_current_overlaps()
+
+
+func _try_apply_damage_from_current_overlaps() -> void:
+	if attack_has_connected:
+		return
+
+	for area in melee_hitbox.get_overlapping_areas():
+		if not (area is Area2D):
+			continue
+		var a := area as Area2D
+		var target := _resolve_player_from_area(a)
+		if target == null:
+			continue
+		var health := target.get_node_or_null("HealthComponent")
+		if health and health.has_method("take_damage"):
+			health.take_damage(attack_damage)
+			attack_has_connected = true
+			return
+
+	for body in melee_hitbox.get_overlapping_bodies():
+		if not (body is Node2D):
+			continue
+		var n := body as Node2D
+		if not n.is_in_group("player"):
+			continue
+		var health := n.get_node_or_null("HealthComponent")
+		if health and health.has_method("take_damage"):
+			health.take_damage(attack_damage)
+			attack_has_connected = true
+			return
+
+func _on_melee_hitbox_area_entered(area: Area2D) -> void:
+	if attack_has_connected:
+		return
+	var target := _resolve_player_from_area(area)
+	if target == null:
+		return
+
+	var health := target.get_node_or_null("HealthComponent")
+	if health and health.has_method("take_damage"):
+		health.take_damage(attack_damage)
+		attack_has_connected = true
+
+func _on_melee_hitbox_body_entered(body: Node2D) -> void:
+	if attack_has_connected:
+		return
+	if not body.is_in_group("player"):
+		return
+	
+	var health := body.get_node_or_null("HealthComponent")
+	if health and health.has_method("take_damage"):
+		health.take_damage(attack_damage)
+		attack_has_connected = true
+
+
+func _resolve_player_from_area(area: Area2D) -> Node2D:
+	if area == null:
+		return null
+	if area.is_in_group("player"):
+		return area
+	var p := area.get_parent()
+	if p is Node2D and p.is_in_group("player"):
+		return p as Node2D
+	return null
+
 func _on_hurt():
 	animated_sprite.play("hurt")
+	_suspicion += damage_suspicion_bonus
+	_suspicion_meter.set_percent(_suspicion / suspicion_max)
 
 
 func _on_died():

@@ -394,6 +394,9 @@ animations = [{
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_qlg0r"]
 size = Vector2(20, 32)
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_jlll7"]
+size = Vector2(30, 42)
+
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_reqs7"]
 size = Vector2(39, 20)
 
@@ -416,6 +419,14 @@ script = ExtResource("43_plcam")
 
 [node name="HealthComponent" type="Node" parent="." unique_id=1151498701]
 script = ExtResource("47_mx1m4")
+
+[node name="Hurtbox" type="Area2D" parent="." unique_id=2125176030]
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox" unique_id=2080324908]
+position = Vector2(0, 11)
+shape = SubResource("RectangleShape2D_jlll7")
+debug_color = Color(0.7, 0, 0, 0.41960785)
 
 [node name="MeleeHitbox" type="Area2D" parent="." unique_id=1931390102]
 monitoring = false
