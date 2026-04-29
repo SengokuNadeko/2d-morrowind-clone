@@ -413,6 +413,14 @@ func _start_attack() -> void:
 
 # Placeholder for future melee/ranged: enter from CHASE when in attack range, play swing, then pop back to CHASE or patrol.
 func _update_attack(_delta: float) -> void:
+	var anim := String(animated_sprite.animation)
+	if not anim.begins_with("slash_"):
+		# If slash gets interrupted (e.g. by hurt), escape ATTACK so AI can resume.
+		if debug_mode:
+			print("Enemy attack interrupted by animation '", anim, "' -> CHASE")
+		state = State.CHASE
+		return
+
 	velocity = Vector2.ZERO
 	direction = Vector2.ZERO
 
@@ -462,6 +470,17 @@ func _is_player_within_attack_trigger(to_player: Vector2) -> bool:
 
 func _on_animation_finished() -> void:
 	var anim := String(animated_sprite.animation)
+	if anim == "hurt":
+		if _player != null and is_instance_valid(_player):
+			if debug_mode:
+				print("Enemy hurt finished -> CHASE")
+			state = State.CHASE
+		else:
+			if debug_mode:
+				print("Enemy hurt finished -> return to patrol")
+			_return_to_patrol()
+		return
+
 	if not anim.begins_with("slash_"):
 		return
 
@@ -643,6 +662,14 @@ func _resolve_player_from_area(area: Area2D) -> Node2D:
 	return null
 
 func _on_hurt():
+	if state == State.ATTACK:
+		attack_hitbox_active = false
+		melee_hitbox.monitoring = false
+		current_attack_anim = ""
+		if debug_mode:
+			print("Enemy hurt while attacking -> cancel ATTACK, switch to CHASE")
+		state = State.CHASE
+	
 	animated_sprite.play("hurt")
 	_suspicion += damage_suspicion_bonus
 	_suspicion_meter.set_percent(_suspicion / suspicion_max)
