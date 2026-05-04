@@ -210,7 +210,7 @@ func _on_animation_finished() -> void:
 
 func _on_hurt():
 	animated_sprite.play("hurt")
-	$Camera2D.add_shake(1.0)
+	$Camera2D.add_shake(5.0)
 
 
 func _on_died():

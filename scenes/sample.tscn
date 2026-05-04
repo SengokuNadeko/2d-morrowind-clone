@@ -4,7 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://ddm383btyb61v" path="res://scenes/player.tscn" id="2_dcudt"]
 [ext_resource type="TileSet" uid="uid://d3waia8merf64" path="res://scripts/player/ElvGames/Rogue Adventure/Tilesets/RA_Village.tres" id="2_mlm6t"]
 [ext_resource type="PackedScene" uid="uid://tpeluot4k8ma" path="res://scenes/enemy.tscn" id="4_dvghh"]
-[ext_resource type="PackedScene" uid="uid://6ntn5uk7l0oq" path="res://scenes/hud.tscn" id="4_tlvjm"]
+[ext_resource type="PackedScene" uid="uid://6ntn5uk7l0oq" path="res://scenes/ui/hud.tscn" id="4_tlvjm"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_dvghh"]
 
