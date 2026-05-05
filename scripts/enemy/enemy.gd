@@ -324,13 +324,9 @@ func _update_patrol_idle_perception(delta: float) -> void:
 		var dist := global_position.distance_to(_player.global_position)
 		var active_radius := line_of_sight_radius if use_line_of_sight else detection_radius
 		var gain_rate := _suspicion_gain_rate_for_distance(dist, active_radius)
-		_suspicion += gain_rate * delta
+		_set_suspicion(_suspicion + gain_rate * delta)
 	else:
-		_suspicion -= suspicion_decay_per_sec * delta
-
-	_suspicion = clampf(_suspicion, 0.0, suspicion_max)
-	if is_instance_valid(_suspicion_meter) and _suspicion_meter.is_inside_tree():
-		_suspicion_meter.set_percent(_suspicion / suspicion_max)
+		_set_suspicion(_suspicion - suspicion_decay_per_sec * delta)
 
 	if _suspicion >= suspicion_max:
 		state = State.CHASE
@@ -662,6 +658,12 @@ func _resolve_player_from_area(area: Area2D) -> Node2D:
 		return p as Node2D
 	return null
 
+func _set_suspicion(value: float) -> void:
+	_suspicion = clampf(value, 0.0, suspicion_max)
+	if is_instance_valid(_suspicion_meter) and _suspicion_meter.is_inside_tree():
+		_suspicion_meter.set_percent(_suspicion / suspicion_max)
+
+
 func _on_hurt():
 	if state == State.ATTACK:
 		attack_hitbox_active = false
@@ -670,10 +672,9 @@ func _on_hurt():
 		if debug_mode:
 			print("Enemy hurt while attacking -> cancel ATTACK, switch to CHASE")
 		state = State.CHASE
-	
+
 	animated_sprite.play("hurt")
-	_suspicion = clampf(_suspicion + damage_suspicion_bonus, 0.0, suspicion_max)
-	_suspicion_meter.set_percent(_suspicion / suspicion_max)
+	_set_suspicion(_suspicion + damage_suspicion_bonus)
 
 	if instant_chase_on_damage and state != State.CHASE:
 		state = State.CHASE
