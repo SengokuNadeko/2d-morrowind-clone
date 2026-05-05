@@ -138,7 +138,7 @@ func _on_attack_frame_changed():
 	var anim:= String(animated_sprite.animation)
 	if not anim.begins_with("slash_"):
 		return
-	
+
 	var window: Vector2i = ATTACK_ACTIVE_FRAMES.get(anim, Vector2i(-1,-1))
 	var frame:= animated_sprite.frame
 	var should_be_active := frame >= window.x and frame <= window.y
@@ -146,6 +146,8 @@ func _on_attack_frame_changed():
 	if should_be_active != attack_hitbox_active:
 		attack_hitbox_active = should_be_active
 		melee_hitbox.monitoring = attack_hitbox_active
+		if attack_hitbox_active:
+			_try_apply_damage_from_current_overlaps()
 
 func _position_hitbox_for_suffix(suffix: String):
 	if suffix == "down":
@@ -159,7 +161,7 @@ func _position_hitbox_for_suffix(suffix: String):
 		melee_hitbox_shape.position.y = 0.0
 		print("Hitbox rotation: ", melee_hitbox_shape.rotation)
 	elif suffix == "right":
-		melee_hitbox_shape.rotation_degrees = -90.0
+		melee_hitbox_shape.rotation_degrees = 90.0
 		melee_hitbox_shape.position.x = HITBOX_DISTANCE
 		melee_hitbox_shape.position.y = 0.0
 		print("Hitbox rotation: ", melee_hitbox_shape.rotation)
@@ -168,6 +170,22 @@ func _position_hitbox_for_suffix(suffix: String):
 		melee_hitbox_shape.position.x = 0.0
 		melee_hitbox_shape.position.y = -HITBOX_DISTANCE
 		print("Hitbox rotation: ", melee_hitbox_shape.rotation)
+
+func _try_apply_damage_from_current_overlaps() -> void:
+	if attack_has_connected:
+		return
+	for area in melee_hitbox.get_overlapping_areas():
+		if not (area is Area2D):
+			continue
+		var enemy = area.get_parent()
+		if not enemy or not enemy.is_in_group("enemy"):
+			continue
+		var health = enemy.get_node_or_null("HealthComponent")
+		if health and health.has_method("take_damage"):
+			health.take_damage(attack_damage)
+			attack_has_connected = true
+			return
+
 
 func _on_melee_hitbox_area_entered(area: Area2D):
 	if attack_has_connected:

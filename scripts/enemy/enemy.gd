@@ -23,7 +23,7 @@ const ATTACK_ACTIVE_FRAMES := {
 	"slash_up": Vector2i(2,3),
 }
 
-const SUSPICION_METER_SCENE := preload("res://scenes/suspicion_meter.tscn")
+const SUSPICION_METER_SCENE := preload("res://scenes/ui/suspicion_meter.tscn")
 var _suspicion_meter: Node2D
 
 var _player: CharacterBody2D = null
@@ -322,7 +322,8 @@ func _update_patrol_idle_perception(delta: float) -> void:
 	var detectable := _is_player_detectable()
 	if detectable:
 		var dist := global_position.distance_to(_player.global_position)
-		var gain_rate := _suspicion_gain_rate_for_distance(dist)
+		var active_radius := line_of_sight_radius if use_line_of_sight else detection_radius
+		var gain_rate := _suspicion_gain_rate_for_distance(dist, active_radius)
 		_suspicion += gain_rate * delta
 	else:
 		_suspicion -= suspicion_decay_per_sec * delta
@@ -569,8 +570,8 @@ func _resolve_player() -> void:
 
 #Suspicion utility functions
 #Utility function to compute suspicion gain from distance
-func _suspicion_gain_rate_for_distance(distance: float) -> float:
-	var t := clampf(1.0 - (distance / detection_radius), 0.0, 1.0)
+func _suspicion_gain_rate_for_distance(distance: float, radius: float) -> float:
+	var t := clampf(1.0 - (distance / radius), 0.0, 1.0)
 	return lerpf(suspicion_gain_far_per_sec, suspicion_gain_near_per_sec, t)
 
 func _is_player_detectable() -> bool:
@@ -671,8 +672,12 @@ func _on_hurt():
 		state = State.CHASE
 	
 	animated_sprite.play("hurt")
-	_suspicion += damage_suspicion_bonus
+	_suspicion = clampf(_suspicion + damage_suspicion_bonus, 0.0, suspicion_max)
 	_suspicion_meter.set_percent(_suspicion / suspicion_max)
+
+	if instant_chase_on_damage and state != State.CHASE:
+		state = State.CHASE
+		_chase_interest_timer = chase_memory_seconds if chase_memory_seconds > 0.0 else INF
 
 
 func _on_died():
