@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(Get-ChildItem -Path \"d:\\\\Godot Projects\\\\2d-morrowind-clone\\\\scripts\" -Recurse -Filter \"*.gd\")",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"d:\\\\Godot Projects\\\\2d-morrowind-clone\" -Recurse -Directory)"
     ]
   }
 }

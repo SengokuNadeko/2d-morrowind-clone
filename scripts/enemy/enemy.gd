@@ -80,7 +80,7 @@ var _patrol_ping_step: int = 1
 @export var suspicion_gain_far_per_sec := 8.0
 @export var suspicion_gain_near_per_sec := 40.0
 @export var near_distance := 32.0
-@export var damage_suspicion_bonus := 45.0
+@export var damage_suspicion_bonus := 100.0
 @export var instant_chase_on_damage := false
 
 #attack export vars
@@ -330,6 +330,7 @@ func _update_patrol_idle_perception(delta: float) -> void:
 
 	if _suspicion >= suspicion_max:
 		state = State.CHASE
+		_leash_origin = global_position
 		_chase_interest_timer = chase_memory_seconds if chase_memory_seconds > 0.0 else INF
 
 # Drive NavigationAgent2D toward the player each tick; same steering pattern as patrol but at chase_speed.
@@ -467,6 +468,12 @@ func _is_player_within_attack_trigger(to_player: Vector2) -> bool:
 
 func _on_animation_finished() -> void:
 	var anim := String(animated_sprite.animation)
+	if anim == "death":
+		if is_instance_valid(_suspicion_meter):
+			_suspicion_meter.queue_free()
+		queue_free()
+		return
+
 	if anim == "hurt":
 		if _player != null and is_instance_valid(_player):
 			if debug_mode:
@@ -678,6 +685,7 @@ func _on_hurt():
 
 	if instant_chase_on_damage and state != State.CHASE:
 		state = State.CHASE
+		_leash_origin = global_position
 		_chase_interest_timer = chase_memory_seconds if chase_memory_seconds > 0.0 else INF
 
 
