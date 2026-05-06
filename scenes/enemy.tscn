@@ -413,6 +413,7 @@ shape = SubResource("RectangleShape2D_u4awx")
 
 [node name="HealthComponent" type="Node" parent="." unique_id=1055785237]
 script = ExtResource("46_j0dkt")
+invulnerability_duration = 0.0
 
 [node name="Hurtbox" type="Area2D" parent="." unique_id=496626955]
 

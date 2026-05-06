@@ -1,12 +1,8 @@
-extends CharacterBody2D
+extends "res://scripts/character_base.gd"
 
-@onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var health_component: Node = $HealthComponent
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 @onready var debug_vision: Node2D = $DebugVision
-
-@onready var melee_hitbox: Area2D = $MeleeHitbox
-@onready var melee_hitbox_shape: CollisionShape2D = $MeleeHitbox/CollisionShape2D
 
 enum State {
 	IDLE,
@@ -16,19 +12,12 @@ enum State {
 	DEAD,
 }
 
-const ATTACK_ACTIVE_FRAMES := {
-	"slash_down": Vector2i(2,3),
-	"slash_left": Vector2i(2,3),
-	"slash_right": Vector2i(2,3),
-	"slash_up": Vector2i(2,3),
-}
-
 const SUSPICION_METER_SCENE := preload("res://scenes/ui/suspicion_meter.tscn")
 var _suspicion_meter: Node2D
 
 var _player: CharacterBody2D = null
 
-# Spawn position used for leash_radius (return to patrol if dragged too far from “home”).
+# True spawn position — captured once in _ready, never updated. Used for leash_radius.
 var _leash_origin: Vector2 = Vector2.ZERO
 
 # While chasing: counts down only when the player is outside lose_radius (with optional LOS).
@@ -37,13 +26,11 @@ var _chase_interest_timer: float = 0.0
 
 var state: State = State.PATROL
 var is_dead: bool = false
-var last_direction: Vector2 = Vector2.DOWN
-var direction: Vector2 = Vector2.ZERO
 
 # Seconds left standing at a waypoint before moving to the next.
 var patrol_wait_timer: float = 0.0
 
-# Marker2D children of the map’s patrol route node, in visit order.
+# Marker2D children of the map's patrol route node, in visit order.
 var patrol_points: Array[Marker2D] = []
 var patrol_index: int = 0
 ## +1 forward through waypoints, -1 backward (used when patrol_mode_loop is false).
@@ -58,8 +45,7 @@ var _patrol_ping_step: int = 1
 @export var lose_radius: float = 200.0
 @export var chase_memory_seconds: float = 2.0
 @export var chase_speed: float = 100.0
-## 0 = no leash. When > 0, chase ends if the enemy moves farther than this from _leash_origin (set once at spawn).
-## If this is small and the patrol route walks the enemy away from spawn, chase will instantly cancel every frame.
+## 0 = no leash. When > 0, chase ends if the enemy moves farther than this from spawn.
 @export var leash_radius: float = 0.0
 @export var use_line_of_sight: bool = false
 ## Max distance used by LOS cone checks (separate from detection/lose radii).
@@ -67,14 +53,13 @@ var _patrol_ping_step: int = 1
 ## Total cone angle in degrees (e.g. 90 means 45 degrees left and right of facing).
 @export var line_of_sight_fov_degrees: float = 90.0
 
-## Assign in the editor to the map’s route node (e.g. PatrolRoute1). If empty, falls back to patrol_route_name under the parent.
+## Assign in the editor to the map's route node (e.g. PatrolRoute1). If empty, falls back to patrol_route_name under the parent.
 @export var patrol_route_path: NodePath
 @export var patrol_route_name: String = "PatrolRoute1"
 @export var waypoint_reach_distance := 8.0
 ## true: A→B→C→D→A…  false: A→B→C→D→C→B→A…
 @export var patrol_mode_loop := true
 
-#Suspicion export vars
 @export var suspicion_max := 100.0
 @export var suspicion_decay_per_sec := 8.0
 @export var suspicion_gain_far_per_sec := 8.0
@@ -83,26 +68,17 @@ var _patrol_ping_step: int = 1
 @export var damage_suspicion_bonus := 100.0
 @export var instant_chase_on_damage := false
 
-#attack export vars
 @export var attack_range: float = 28.0
 @export var attack_damage: int = 10
 @export var attack_cooldown: float = 0.8
 @export var hitbox_distance: float = 22.0
 
 var attack_cooldown_left: float = 0.0
-var attack_hitbox_active: bool = false
-var attack_has_connected: bool = false
-var current_attack_anim: String = ""
-
-#Suspicion runtime var
 var _suspicion: float = 0.0
 
 func _ready() -> void:
-	if debug_mode:
-		debug_vision.visible = true
-	else:
-		debug_vision.visible = false
-	
+	debug_vision.visible = debug_mode
+
 	_suspicion_meter = SUSPICION_METER_SCENE.instantiate()
 	var root := get_tree().current_scene
 	if root != null:
@@ -111,19 +87,14 @@ func _ready() -> void:
 		get_tree().root.call_deferred("add_child", _suspicion_meter)
 	_suspicion_meter.target = self
 
-	# Capture after the node is in the tree so global_position matches the placed enemy.
 	_leash_origin = global_position
 
 	if _player == null or not is_instance_valid(_player):
 		_resolve_player()
 
-	# Always wire health first so enemies with no route still react to damage/death.
 	health_component.died.connect(_on_died)
 	health_component.hurt.connect(_on_hurt)
-	health_component.invulnerability_started.connect(_on_invulnerability_started)
-	health_component.invulnerability_ended.connect(_on_invulnerability_ended)
-	
-	#wire attack signals
+
 	animated_sprite.animation_finished.connect(_on_animation_finished)
 	animated_sprite.frame_changed.connect(_on_attack_frame_changed)
 	melee_hitbox.area_entered.connect(_on_melee_hitbox_area_entered)
@@ -136,7 +107,7 @@ func _ready() -> void:
 		for child in route.get_children():
 			if child is Marker2D:
 				patrol_points.append(child)
-		# Scene tree order is preserved; sort by node name so A,B,C,D is stable if reordered in editor.
+		# Sort by node name so A,B,C,D order is stable regardless of scene-tree order.
 		patrol_points.sort_custom(func(a: Marker2D, b: Marker2D) -> bool:
 			return String(a.name) < String(b.name)
 		)
@@ -151,7 +122,7 @@ func _ready() -> void:
 	call_deferred("_refresh_nav_target_to_current_waypoint")
 
 
-# Editor path wins; otherwise look for patrol_route_name on the same parent as this enemy (typical map layout).
+# Editor path wins; otherwise look for patrol_route_name on the same parent as this enemy.
 func _resolve_patrol_route() -> Node2D:
 	if patrol_route_path != NodePath():
 		var n := get_node_or_null(patrol_route_path)
@@ -165,7 +136,6 @@ func _resolve_patrol_route() -> Node2D:
 	return null
 
 
-# NavigationAgent2D expects a global point on the baked nav region.
 func _refresh_nav_target_to_current_waypoint() -> void:
 	if patrol_points.is_empty():
 		return
@@ -173,7 +143,6 @@ func _refresh_nav_target_to_current_waypoint() -> void:
 	nav_agent.target_position = patrol_points[patrol_index].global_position
 
 
-# Called after finishing the wait at a waypoint (see _update_idle). Updates patrol_index only; target is set separately.
 func _advance_patrol_index() -> void:
 	if patrol_points.is_empty():
 		return
@@ -201,15 +170,12 @@ func _physics_process(_delta: float) -> void:
 
 	attack_cooldown_left = maxf(attack_cooldown_left - _delta, 0.0)
 
-	# State machine: patrol/idle can switch into CHASE when perception fires; CHASE/ATTACK run their own tick.
 	match state:
 		State.PATROL:
-			# Spot the player even while walking the route (not only when standing at a waypoint).
 			_update_patrol_idle_perception(_delta)
 			if state == State.PATROL:
 				_update_patrol(_delta)
 		State.IDLE:
-			# Same as patrol: standing at a waypoint should not make the enemy “blind”.
 			_update_patrol_idle_perception(_delta)
 			if state == State.IDLE:
 				_update_idle(_delta)
@@ -221,7 +187,6 @@ func _physics_process(_delta: float) -> void:
 	if direction:
 		last_direction = direction
 
-	# Keep debug cone aligned in every state, not only while patrolling.
 	if debug_vision != null:
 		var facing := direction if direction != Vector2.ZERO else last_direction
 		debug_vision.rotation = facing.angle()
@@ -229,48 +194,20 @@ func _physics_process(_delta: float) -> void:
 	update_animation()
 
 
-func _movement_animation_blocked() -> bool:
-	if not animated_sprite.is_playing():
-		return false
-	var n := String(animated_sprite.animation)
-	return n == "hurt" or n.begins_with("slash_")
-
-
 func update_animation() -> void:
 	if _movement_animation_blocked():
 		return
 	if is_dead:
 		return
-
-	var moving := direction != Vector2.ZERO
-	var facing := direction if moving else last_direction
-	var anim := ("walk_" if moving else "idle_") + _facing_suffix(facing)
-	if animated_sprite.animation != anim or not animated_sprite.is_playing():
-		animated_sprite.play(anim)
+	super.update_animation()
 
 
-func _facing_suffix(dir: Vector2) -> String:
-	if dir.length_squared() == 0.0:
-		return "down"
-	var ax := absf(dir.x)
-	var ay := absf(dir.y)
-	if ax >= ay:
-		if dir.x > 0.0:
-			return "right"
-		if dir.x < 0.0:
-			return "left"
-		return "down" if dir.y > 0.0 else "up"
-	return "down" if dir.y > 0.0 else "up"
-
-
-# Follow NavigationAgent2D’s path toward the current waypoint; pause at waypoints via IDLE + patrol_wait_timer.
 func _update_patrol(delta: float) -> void:
 	if patrol_points.is_empty():
 		velocity = Vector2.ZERO
 		direction = Vector2.ZERO
 		return
 
-	# Still counting down the stand-still at this waypoint (timer was set when we entered IDLE from patrol).
 	if patrol_wait_timer > 0.0:
 		patrol_wait_timer -= delta
 		velocity = Vector2.ZERO
@@ -278,14 +215,12 @@ func _update_patrol(delta: float) -> void:
 		_refresh_nav_target_to_current_waypoint()
 		return
 
-	# Steer toward the next baked path corner; avoids static obstacles per NavigationRegion2D.
 	var next_pos := nav_agent.get_next_path_position()
 	var to_next := next_pos - global_position
 	var dir := Vector2.ZERO
 	if to_next.length_squared() > 0.0001:
 		dir = to_next.normalized()
 	else:
-		# Agent can report “next” == self when path is empty or not updated yet; nudge toward the marker.
 		var to_wp := patrol_points[patrol_index].global_position - global_position
 		if to_wp.length_squared() > 0.0001:
 			dir = to_wp.normalized()
@@ -294,7 +229,6 @@ func _update_patrol(delta: float) -> void:
 	velocity = dir * patrol_speed
 	move_and_slide()
 
-	# Close enough to this waypoint: stop moving and hand off to IDLE (actual index bump happens after the wait).
 	if global_position.distance_to(patrol_points[patrol_index].global_position) <= waypoint_reach_distance:
 		patrol_wait_timer = patrol_wait_time
 		state = State.IDLE
@@ -308,7 +242,6 @@ func _update_idle(delta: float) -> void:
 		patrol_wait_timer -= delta
 		return
 
-	# Wait finished: pick next waypoint, tell the nav agent, resume walking.
 	_advance_patrol_index()
 	_refresh_nav_target_to_current_waypoint()
 	state = State.PATROL
@@ -318,7 +251,7 @@ func _update_patrol_idle_perception(delta: float) -> void:
 		_resolve_player()
 	if _player == null or not is_instance_valid(_player):
 		return
-	
+
 	var detectable := _is_player_detectable()
 	if detectable:
 		var dist := global_position.distance_to(_player.global_position)
@@ -330,25 +263,20 @@ func _update_patrol_idle_perception(delta: float) -> void:
 
 	if _suspicion >= suspicion_max:
 		state = State.CHASE
-		_leash_origin = global_position
 		_chase_interest_timer = chase_memory_seconds if chase_memory_seconds > 0.0 else INF
 
-# Drive NavigationAgent2D toward the player each tick; same steering pattern as patrol but at chase_speed.
+
 func _update_chase(delta: float) -> void:
 	if _player == null or not is_instance_valid(_player):
 		_resolve_player()
 	if _player == null or not is_instance_valid(_player):
 		_return_to_patrol()
 		return
-	
-	# Leash: stop pursuing if kited too far from where the enemy started (prevents map-wide chases).
-	# leash_radius <= 0 disables this check — a small positive radius while patrolling far from spawn causes
-	# chase to end on the first physics tick (flip-flop PATROL/CHASE) because _leash_origin never moves.
+
 	if leash_radius > 0.0 and global_position.distance_squared_to(_leash_origin) > leash_radius * leash_radius:
 		_return_to_patrol()
 		return
 
-	# Keep the baked path updated toward the moving player.
 	nav_agent.target_position = _player.global_position
 
 	var next_pos := nav_agent.get_next_path_position()
@@ -361,7 +289,6 @@ func _update_chase(delta: float) -> void:
 		if to_player.length_squared() > 0.0001:
 			dir = to_player.normalized()
 
-	# Enter attack when close enough and the cooldown is ready.
 	var to_player_now := _player.global_position - global_position
 	if _is_player_within_attack_trigger(to_player_now) and attack_cooldown_left <= 0.0:
 		_start_attack()
@@ -371,10 +298,6 @@ func _update_chase(delta: float) -> void:
 	velocity = dir * chase_speed
 	move_and_slide()
 
-	# Hysteresis + memory: stay committed while perception still says “valid target”.
-	# LOS off: keep the original lose_radius behavior.
-	# LOS on: keep LOS requirement and use a cone radius at least as large as lose_radius so retention
-	# does not become stricter than your de-aggro radius tuning.
 	var in_lose := false
 	if use_line_of_sight:
 		var los_keep_radius := maxf(lose_radius, line_of_sight_radius)
@@ -383,7 +306,6 @@ func _update_chase(delta: float) -> void:
 		in_lose = global_position.distance_squared_to(_player.global_position) <= lose_radius * lose_radius
 
 	if in_lose:
-		# chase_memory_seconds == 0 means “no grace after leaving lose_radius”, not “give up while still in range”.
 		_chase_interest_timer = chase_memory_seconds if chase_memory_seconds > 0.0 else INF
 	else:
 		_chase_interest_timer -= delta
@@ -405,15 +327,14 @@ func _start_attack() -> void:
 	attack_hitbox_active = false
 	melee_hitbox.monitoring = false
 
-	_position_hitbox_for_suffix(suffix)
+	_position_hitbox_for_suffix(suffix, hitbox_distance)
 	animated_sprite.play(current_attack_anim)
 	attack_cooldown_left = attack_cooldown
 
-# Placeholder for future melee/ranged: enter from CHASE when in attack range, play swing, then pop back to CHASE or patrol.
+
 func _update_attack(_delta: float) -> void:
 	var anim := String(animated_sprite.animation)
 	if not anim.begins_with("slash_"):
-		# If slash gets interrupted (e.g. by hurt), escape ATTACK so AI can resume.
 		if debug_mode:
 			print("Enemy attack interrupted by animation '", anim, "' -> CHASE")
 		state = State.CHASE
@@ -421,25 +342,6 @@ func _update_attack(_delta: float) -> void:
 
 	velocity = Vector2.ZERO
 	direction = Vector2.ZERO
-
-
-func _position_hitbox_for_suffix(suffix: String) -> void:
-	if suffix == "down":
-		melee_hitbox_shape.rotation_degrees = 0.0
-		melee_hitbox_shape.position.x = 0.0
-		melee_hitbox_shape.position.y = hitbox_distance
-	elif suffix == "left":
-		melee_hitbox_shape.rotation_degrees = 90.0
-		melee_hitbox_shape.position.x = -hitbox_distance
-		melee_hitbox_shape.position.y = 0.0
-	elif suffix == "right":
-		melee_hitbox_shape.rotation_degrees = 90.0
-		melee_hitbox_shape.position.x = hitbox_distance
-		melee_hitbox_shape.position.y = 0.0
-	elif suffix == "up":
-		melee_hitbox_shape.rotation_degrees = 0.0
-		melee_hitbox_shape.position.x = 0.0
-		melee_hitbox_shape.position.y = -hitbox_distance
 
 
 func _cardinal_from_vector(v: Vector2) -> Vector2:
@@ -451,19 +353,17 @@ func _cardinal_from_vector(v: Vector2) -> Vector2:
 
 
 func _is_player_within_attack_trigger(to_player: Vector2) -> bool:
-	# Collider-aware axis check. Player and enemy body shapes are taller than wide,
-	# so north/south contact distance is larger than east/west.
-	# attack_range is treated as extra reach beyond body contact.
+	# Player and enemy body shapes are taller than wide, so N/S contact distance differs from E/W.
+	# attack_range is extra reach beyond body contact.
 	var body_half_w := 10.0
 	var body_half_h := 16.0
-
-	var contact_x := body_half_w + body_half_w
-	var contact_y := body_half_h + body_half_h
-
-	var trigger_x := contact_x + attack_range
-	var trigger_y := contact_y + attack_range
-
+	var trigger_x := body_half_w + body_half_w + attack_range
+	var trigger_y := body_half_h + body_half_h + attack_range
 	return absf(to_player.x) <= trigger_x and absf(to_player.y) <= trigger_y
+
+
+func _on_hitbox_activated() -> void:
+	_try_apply_damage_from_current_overlaps()
 
 
 func _on_animation_finished() -> void:
@@ -488,16 +388,12 @@ func _on_animation_finished() -> void:
 	if not anim.begins_with("slash_"):
 		return
 
-	attack_hitbox_active = false
-	melee_hitbox.monitoring = false
-	current_attack_anim = ""
+	_clear_attack_state()
 
-	# Keep pressure when player stays nearby; otherwise resume chase pathing.
 	if state == State.ATTACK:
 		state = State.CHASE
 
 
-# Resume the patrol route from the current waypoint (or keep waiting if we interrupted a waypoint pause).
 func _return_to_patrol() -> void:
 	if patrol_points.is_empty():
 		state = State.IDLE
@@ -516,14 +412,12 @@ func _has_line_of_sight_to_player() -> bool:
 	var space := get_world_2d().direct_space_state
 	var q := PhysicsRayQueryParameters2D.create(global_position, _player.global_position)
 	q.exclude = [get_rid()]
-	# Ignore Areas for LOS so player/enemy hitboxes don't falsely block vision.
 	q.collide_with_areas = false
 	q.collide_with_bodies = true
 	var hit := space.intersect_ray(q)
 	if hit.is_empty():
 		return true
 	var collider: Object = hit.get("collider", null)
-	# Accept direct player body or child colliders that belong to the player.
 	if collider == _player:
 		return true
 	if collider is Node:
@@ -535,8 +429,6 @@ func _has_line_of_sight_to_player() -> bool:
 	return false
 
 
-# Cone + radius + occlusion test used when use_line_of_sight is enabled.
-# The enemy's "forward" is the current movement direction; when idle, it falls back to last_direction.
 func _can_see_player_in_cone(radius: float) -> bool:
 	if _player == null or not is_instance_valid(_player):
 		return false
@@ -547,7 +439,6 @@ func _can_see_player_in_cone(radius: float) -> bool:
 	if to_player.length_squared() > radius * radius:
 		return false
 
-	# Use movement direction as the facing vector; fallback keeps a stable cone while standing still.
 	var facing := direction if direction.length_squared() > 0.0 else last_direction
 	if facing.length_squared() == 0.0:
 		facing = Vector2.DOWN
@@ -556,23 +447,16 @@ func _can_see_player_in_cone(radius: float) -> bool:
 	var dir_to_player := to_player.normalized()
 	var half_fov_rad := deg_to_rad(clampf(line_of_sight_fov_degrees, 0.0, 360.0) * 0.5)
 	var min_dot := cos(half_fov_rad)
-	# Dot product compares angle cheaply: 1.0 = directly ahead, 0.0 = 90 degrees, -1.0 = behind.
 	if facing.dot(dir_to_player) < min_dot:
 		return false
 
-	# Final check: even inside the cone, a wall should block sight.
 	return _has_line_of_sight_to_player()
 
 
 func _resolve_player() -> void:
 	_player = get_tree().get_first_node_in_group("player")
-	if _player != null and is_instance_valid(_player):
-		print("Player found: ", _player.name)
-	else:
-		print("Player not found")
 
-#Suspicion utility functions
-#Utility function to compute suspicion gain from distance
+
 func _suspicion_gain_rate_for_distance(distance: float, radius: float) -> float:
 	var t := clampf(1.0 - (distance / radius), 0.0, 1.0)
 	return lerpf(suspicion_gain_far_per_sec, suspicion_gain_near_per_sec, t)
@@ -586,21 +470,6 @@ func _is_player_detectable() -> bool:
 		return _can_see_player_in_cone(line_of_sight_radius)
 	return global_position.distance_squared_to(_player.global_position) <= detection_radius * detection_radius
 
-func _on_attack_frame_changed() -> void:
-	var anim := String(animated_sprite.animation)
-	if not anim.begins_with("slash_"):
-		return
-	
-	var window: Vector2i = ATTACK_ACTIVE_FRAMES.get(anim, Vector2i(-1,-1))
-	var frame:= animated_sprite.frame
-	var should_be_active := frame >= window.x and frame <= window.y
-
-	if should_be_active != attack_hitbox_active:
-		attack_hitbox_active = should_be_active
-		melee_hitbox.monitoring = should_be_active
-		if should_be_active:
-			_try_apply_damage_from_current_overlaps()
-
 
 func _try_apply_damage_from_current_overlaps() -> void:
 	if attack_has_connected:
@@ -609,8 +478,7 @@ func _try_apply_damage_from_current_overlaps() -> void:
 	for area in melee_hitbox.get_overlapping_areas():
 		if not (area is Area2D):
 			continue
-		var a := area as Area2D
-		var target := _resolve_player_from_area(a)
+		var target := _resolve_player_from_area(area as Area2D)
 		if target == null:
 			continue
 		var health := target.get_node_or_null("HealthComponent")
@@ -648,7 +516,7 @@ func _on_melee_hitbox_body_entered(body: Node2D) -> void:
 		return
 	if not body.is_in_group("player"):
 		return
-	
+
 	var health := body.get_node_or_null("HealthComponent")
 	if health and health.has_method("take_damage"):
 		health.take_damage(attack_damage)
@@ -673,9 +541,7 @@ func _set_suspicion(value: float) -> void:
 
 func _on_hurt():
 	if state == State.ATTACK:
-		attack_hitbox_active = false
-		melee_hitbox.monitoring = false
-		current_attack_anim = ""
+		_clear_attack_state()
 		if debug_mode:
 			print("Enemy hurt while attacking -> cancel ATTACK, switch to CHASE")
 		state = State.CHASE
@@ -685,18 +551,9 @@ func _on_hurt():
 
 	if instant_chase_on_damage and state != State.CHASE:
 		state = State.CHASE
-		_leash_origin = global_position
 		_chase_interest_timer = chase_memory_seconds if chase_memory_seconds > 0.0 else INF
 
 
 func _on_died():
 	is_dead = true
 	animated_sprite.play("death")
-
-
-func _on_invulnerability_started():
-	print("Enemy invulnerability started")
-
-
-func _on_invulnerability_ended():
-	print("Enemy invulnerability ended")

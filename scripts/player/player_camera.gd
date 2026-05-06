@@ -23,17 +23,6 @@ func _ready() -> void:
 	limit_bottom = int(ceil(bottom_right_global.y))
 	limit_enabled = true
 
-func _process(delta: float) -> void:
-	#apply random offset each frame
-	if shake_strength > 0.0:
-		offset = Vector2(
-			randf_range(-max_shake_offset.x, max_shake_offset.x),
-			randf_range(-max_shake_offset.y, max_shake_offset.y)
-		)
-		shake_strength = max(0.0, shake_strength - shake_decay * delta)
-	else:
-		offset = Vector2.ZERO
-
 func _find_ground_layer() -> TileMapLayer:
 	var root := get_tree().current_scene
 	if root == null:
@@ -43,6 +32,15 @@ func _find_ground_layer() -> TileMapLayer:
 		return found as TileMapLayer
 	return null
 
-func add_shake(intensity:float) -> void:
+func _process(delta: float) -> void:
+	if shake_strength > 0.0:
+		offset = Vector2(
+			randf_range(-max_shake_offset.x, max_shake_offset.x),
+			randf_range(-max_shake_offset.y, max_shake_offset.y)
+		)
+		shake_strength = max(0.0, shake_strength - shake_decay * delta)
+	else:
+		offset = Vector2.ZERO
+
+func add_shake(intensity: float) -> void:
 	shake_strength = maxf(shake_strength, intensity)
-	print("Shake strength: ", shake_strength)
