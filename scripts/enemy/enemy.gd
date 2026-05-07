@@ -547,6 +547,7 @@ func _on_hurt():
 		state = State.CHASE
 
 	animated_sprite.play("hurt")
+	_flash_on_hit()
 	_set_suspicion(_suspicion + damage_suspicion_bonus)
 
 	if instant_chase_on_damage and state != State.CHASE:

@@ -155,6 +155,7 @@ func _on_death_animation_finished() -> void:
 func _on_hurt():
 	animated_sprite.play("hurt")
 	$Camera2D.add_shake(5.0)
+	_flash_on_hit()
 
 
 func _on_died():

@@ -11,12 +11,17 @@ const ATTACK_ACTIVE_FRAMES := {
 	"slash_up": Vector2i(2, 3),
 }
 
+const _HIT_FLASH_SHADER := preload("res://shaders/hit_flash.gdshader")
+
 var last_direction: Vector2 = Vector2.DOWN
 var direction: Vector2 = Vector2.ZERO
 
 var current_attack_anim: String = ""
 var attack_hitbox_active: bool = false
 var attack_has_connected: bool = false
+
+var _hit_flash_material: ShaderMaterial = null
+var _flash_tween: Tween = null
 
 
 func _facing_suffix(dir: Vector2) -> String:
@@ -91,3 +96,25 @@ func _clear_attack_state() -> void:
 	attack_hitbox_active = false
 	melee_hitbox.monitoring = false
 	current_attack_anim = ""
+
+
+func _flash_on_hit() -> void:
+	if _hit_flash_material == null:
+		_hit_flash_material = ShaderMaterial.new()
+		_hit_flash_material.shader = _HIT_FLASH_SHADER
+
+	if _flash_tween and _flash_tween.is_valid():
+		_flash_tween.kill()
+
+	animated_sprite.material = _hit_flash_material
+	_flash_tween = create_tween()
+	for i in 3:
+		_flash_tween.tween_method(
+			func(v: float): _hit_flash_material.set_shader_parameter("flash_intensity", v),
+			0.0, 1.0, 0.05
+		)
+		_flash_tween.tween_method(
+			func(v: float): _hit_flash_material.set_shader_parameter("flash_intensity", v),
+			1.0, 0.0, 0.05
+		)
+	_flash_tween.tween_callback(func(): animated_sprite.material = null)
