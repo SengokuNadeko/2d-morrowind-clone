@@ -5,6 +5,7 @@
 [ext_resource type="TileSet" uid="uid://d3waia8merf64" path="res://scripts/player/ElvGames/Rogue Adventure/Tilesets/RA_Village.tres" id="2_mlm6t"]
 [ext_resource type="PackedScene" uid="uid://tpeluot4k8ma" path="res://scenes/enemy.tscn" id="4_dvghh"]
 [ext_resource type="PackedScene" uid="uid://6ntn5uk7l0oq" path="res://scenes/ui/hud.tscn" id="4_tlvjm"]
+[ext_resource type="Resource" uid="uid://dtcijsq2ig6xf" path="res://resources/items/loot_tables/lizardman.tres" id="5_bdjb6"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_dvghh"]
 
@@ -22,6 +23,7 @@ tile_set = ExtResource("2_mlm6t")
 
 [node name="Player" parent="." unique_id=1702344883 instance=ExtResource("2_dcudt")]
 position = Vector2(576, 373)
+attack_damage = 100
 
 [node name="Enemy" parent="." unique_id=1003581531 instance=ExtResource("4_dvghh")]
 position = Vector2(441, 372)
@@ -29,6 +31,7 @@ debug_mode = true
 use_line_of_sight = true
 suspicion_gain_far_per_sec = 20.0
 suspicion_gain_near_per_sec = 60.0
+loot_table = ExtResource("5_bdjb6")
 attack_range = 36.0
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1192879223]

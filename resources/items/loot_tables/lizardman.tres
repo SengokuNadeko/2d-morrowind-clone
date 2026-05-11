@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="LootTable" format=3 uid="uid://dtcijsq2ig6xf"]
+
+[ext_resource type="Script" uid="uid://cc2qovvneq0m5" path="res://scripts/loot_table_entry.gd" id="1_ns3qc"]
+[ext_resource type="Script" uid="uid://kwq25843iu1x" path="res://scripts/loot_table.gd" id="2_7e5tr"]
+[ext_resource type="Texture2D" uid="uid://66p8cxahto41" path="res://ElvGames/Rogue Adventure/User Interface/Item Icons/RA_Item_Icons.png" id="2_cmi8t"]
+[ext_resource type="Script" uid="uid://3b0jyjjj8ske" path="res://scripts/item_data.gd" id="3_2h2ji"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_tb3k2"]
+atlas = ExtResource("2_cmi8t")
+region = Rect2(256, 320, 16, 16)
+
+[sub_resource type="Resource" id="Resource_2owlk"]
+script = ExtResource("3_2h2ji")
+item_id = "1"
+display_name = "Copper Coin"
+icon = SubResource("AtlasTexture_tb3k2")
+metadata/_custom_type_script = "uid://3b0jyjjj8ske"
+
+[sub_resource type="Resource" id="Resource_pud5k"]
+script = ExtResource("1_ns3qc")
+item = SubResource("Resource_2owlk")
+metadata/_custom_type_script = "uid://cc2qovvneq0m5"
+
+[resource]
+script = ExtResource("2_7e5tr")
+entries = Array[ExtResource("1_ns3qc")]([SubResource("Resource_pud5k")])
+metadata/_custom_type_script = "uid://kwq25843iu1x"

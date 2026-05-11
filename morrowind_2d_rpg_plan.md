@@ -139,10 +139,10 @@ func _physics_process(delta):
 ## Week 3-4: Basic Combat
 
 ### Combat Components
-- [ ] Health system (HP bar, damage, death)
-- [ ] Melee attack (hitbox, timing, cooldown)
-- [ ] Simple enemy AI (patrol, chase, attack)
-- [ ] Hit feedback (screen shake, damage numbers)
+- [X] Health system (HP bar, damage, death)
+- [X] Melee attack (hitbox, timing, cooldown)
+- [X] Simple enemy AI (patrol, chase, attack)
+- [X] Hit feedback (screen shake, damage numbers)
 - [ ] Basic loot drops
 
 ### First Enemy Template

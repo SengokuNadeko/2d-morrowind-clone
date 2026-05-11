@@ -13,6 +13,7 @@ enum State {
 }
 
 const SUSPICION_METER_SCENE := preload("res://scenes/ui/suspicion_meter.tscn")
+const LOOT_DROP_SCENE := preload("res://scenes/loot_drop.tscn")
 var _suspicion_meter: Node2D
 
 var _player: CharacterBody2D = null
@@ -67,6 +68,8 @@ var _patrol_ping_step: int = 1
 @export var near_distance := 32.0
 @export var damage_suspicion_bonus := 100.0
 @export var instant_chase_on_damage := false
+
+@export var loot_table: LootTable
 
 @export var attack_range: float = 28.0
 @export var attack_damage: int = 10
@@ -571,3 +574,14 @@ func _on_hurt():
 func _on_died():
 	is_dead = true
 	animated_sprite.play("death")
+	_spawn_loot()
+
+
+func _spawn_loot() -> void:
+	if loot_table == null:
+		return
+	for item in loot_table.roll():
+		var drop: LootDrop = LOOT_DROP_SCENE.instantiate()
+		drop.item_data = item
+		get_parent().add_child(drop)
+		drop.global_position = global_position + Vector2(randf_range(-12.0, 12.0), randf_range(-12.0, 12.0))
