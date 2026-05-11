@@ -191,6 +191,9 @@ func _physics_process(_delta: float) -> void:
 		var facing := direction if direction != Vector2.ZERO else last_direction
 		debug_vision.rotation = facing.angle()
 
+	knockback_velocity = knockback_velocity.move_toward(Vector2.ZERO, knockback_decay * _delta)
+	velocity += knockback_velocity
+	move_and_slide()
 	update_animation()
 
 
@@ -227,7 +230,6 @@ func _update_patrol(delta: float) -> void:
 
 	direction = dir
 	velocity = dir * patrol_speed
-	move_and_slide()
 
 	if global_position.distance_to(patrol_points[patrol_index].global_position) <= waypoint_reach_distance:
 		patrol_wait_timer = patrol_wait_time
@@ -296,7 +298,6 @@ func _update_chase(delta: float) -> void:
 
 	direction = dir
 	velocity = dir * chase_speed
-	move_and_slide()
 
 	var in_lose := false
 	if use_line_of_sight:
@@ -484,6 +485,9 @@ func _try_apply_damage_from_current_overlaps() -> void:
 		var health := target.get_node_or_null("HealthComponent")
 		if health and health.has_method("take_damage"):
 			health.take_damage(attack_damage)
+			var kb_dir: Vector2 = (target.global_position - global_position).normalized()
+			if target.has_method("apply_knockback"):
+				target.apply_knockback(kb_dir * 200.0)
 			attack_has_connected = true
 			return
 
@@ -496,6 +500,9 @@ func _try_apply_damage_from_current_overlaps() -> void:
 		var health := n.get_node_or_null("HealthComponent")
 		if health and health.has_method("take_damage"):
 			health.take_damage(attack_damage)
+			var kb_dir: Vector2 = (n.global_position - global_position).normalized()
+			if n.has_method("apply_knockback"):
+				n.apply_knockback(kb_dir * 200.0)
 			attack_has_connected = true
 			return
 
@@ -509,6 +516,9 @@ func _on_melee_hitbox_area_entered(area: Area2D) -> void:
 	var health := target.get_node_or_null("HealthComponent")
 	if health and health.has_method("take_damage"):
 		health.take_damage(attack_damage)
+		var kb_dir: Vector2 = (target.global_position - global_position).normalized()
+		if target.has_method("apply_knockback"):
+			target.apply_knockback(kb_dir * 200.0)
 		attack_has_connected = true
 
 func _on_melee_hitbox_body_entered(body: Node2D) -> void:
@@ -520,6 +530,9 @@ func _on_melee_hitbox_body_entered(body: Node2D) -> void:
 	var health := body.get_node_or_null("HealthComponent")
 	if health and health.has_method("take_damage"):
 		health.take_damage(attack_damage)
+		var kb_dir: Vector2 = (body.global_position - global_position).normalized()
+		if body.has_method("apply_knockback"):
+			body.apply_knockback(kb_dir * 200.0)
 		attack_has_connected = true
 
 

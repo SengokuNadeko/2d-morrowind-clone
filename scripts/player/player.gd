@@ -28,10 +28,10 @@ func _physics_process(_delta: float) -> void:
 	if Input.is_action_just_pressed("test_hurt_and_death"):
 		health_component.take_damage(10)
 
-	player_movement()
+	player_movement(_delta)
 	player_attack()
 
-func player_movement():
+func player_movement(delta: float):
 	if is_dead:
 		return
 	if Input.is_action_just_pressed("sprint"):
@@ -54,6 +54,8 @@ func player_movement():
 		velocity = Vector2.ZERO
 		animated_sprite.speed_scale = 1.0
 
+	knockback_velocity = knockback_velocity.move_toward(Vector2.ZERO, knockback_decay * delta)
+	velocity += knockback_velocity
 	move_and_slide()
 	update_animation()
 
@@ -111,6 +113,9 @@ func _try_apply_damage_from_current_overlaps() -> void:
 		var health = enemy.get_node_or_null("HealthComponent")
 		if health and health.has_method("take_damage"):
 			health.take_damage(attack_damage)
+			var kb_dir: Vector2 = ((enemy as Node2D).global_position - global_position).normalized()
+			if enemy.has_method("apply_knockback"):
+				enemy.apply_knockback(kb_dir * 300.0)
 			attack_has_connected = true
 			return
 
@@ -125,6 +130,9 @@ func _on_melee_hitbox_area_entered(area: Area2D):
 	var health = enemy.get_node_or_null("HealthComponent")
 	if health and health.has_method("take_damage"):
 		health.take_damage(attack_damage)
+		var kb_dir: Vector2 = ((enemy as Node2D).global_position - global_position).normalized()
+		if enemy.has_method("apply_knockback"):
+			enemy.apply_knockback(kb_dir * 300.0)
 		attack_has_connected = true
 
 

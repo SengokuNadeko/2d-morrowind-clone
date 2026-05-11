@@ -15,6 +15,8 @@ const _HIT_FLASH_SHADER := preload("res://shaders/hit_flash.gdshader")
 
 var last_direction: Vector2 = Vector2.DOWN
 var direction: Vector2 = Vector2.ZERO
+var knockback_velocity: Vector2 = Vector2.ZERO
+@export var knockback_decay: float = 800.0
 
 var current_attack_anim: String = ""
 var attack_hitbox_active: bool = false
@@ -118,3 +120,7 @@ func _flash_on_hit() -> void:
 			1.0, 0.0, 0.05
 		)
 	_flash_tween.tween_callback(func(): animated_sprite.material = null)
+
+
+func apply_knockback(impulse: Vector2) -> void:
+	knockback_velocity = impulse

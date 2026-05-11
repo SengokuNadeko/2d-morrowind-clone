@@ -4,7 +4,9 @@
       "Bash(Get-ChildItem -Path \"d:\\\\Godot Projects\\\\2d-morrowind-clone\\\\scripts\" -Recurse -Filter \"*.gd\")",
       "Bash(Select-Object FullName)",
       "Bash(Get-ChildItem -Path \"d:\\\\Godot Projects\\\\2d-morrowind-clone\" -Recurse -Directory)",
-      "PowerShell(Get-ChildItem -Path \"d:\\\\Godot Projects\\\\2d-morrowind-clone\" -Recurse -File | Where-Object { $_.Extension -in @\\('.gd', '.tscn', '.tres'\\) -or $_.Name -eq 'project.godot' } | Select-Object -ExpandProperty FullName | Sort-Object)"
+      "PowerShell(Get-ChildItem -Path \"d:\\\\Godot Projects\\\\2d-morrowind-clone\" -Recurse -File | Where-Object { $_.Extension -in @\\('.gd', '.tscn', '.tres'\\) -or $_.Name -eq 'project.godot' } | Select-Object -ExpandProperty FullName | Sort-Object)",
+      "Bash(Get-ChildItem -Path \"d:\\\\Godot Projects\\\\2d-morrowind-clone\" -Recurse -Filter \"*.gd\")",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ]
   }
 }
