@@ -143,7 +143,7 @@ func _physics_process(delta):
 - [X] Melee attack (hitbox, timing, cooldown)
 - [X] Simple enemy AI (patrol, chase, attack)
 - [X] Hit feedback (screen shake, damage numbers)
-- [ ] Basic loot drops
+- [X] Basic loot drops
 
 ### First Enemy Template
 ```gdscript
