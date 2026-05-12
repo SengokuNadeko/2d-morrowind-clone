@@ -10,6 +10,7 @@
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_dvghh"]
 
 [node name="Sample" type="Node2D" unique_id=833724449]
+y_sort_enabled = true
 
 [node name="Ground" type="TileMapLayer" parent="." unique_id=1789916587]
 scale = Vector2(2, 2)
@@ -17,6 +18,7 @@ tile_map_data = PackedByteArray("AAAAAAAAAAACAAUAAAAAAAEAAAACAAUAAAAAAAIAAAACAAU
 tile_set = ExtResource("1_mlm6t")
 
 [node name="Objects" type="TileMapLayer" parent="." unique_id=494907057]
+y_sort_enabled = true
 scale = Vector2(2, 2)
 tile_map_data = PackedByteArray("AAAVAAkAAAAFAAoAAAAVAAoAAAAFAAsAAAAVAAsAAAAFAAwAAAAWAAkAAAAGAAoAAAAWAAoAAAAGAAsAAAAWAAsAAAAGAAwAAAA=")
 tile_set = ExtResource("2_mlm6t")
