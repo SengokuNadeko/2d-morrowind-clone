@@ -1,6 +1,6 @@
-[gd_resource type="TileSet" load_steps=3 format=3 uid="uid://c70jv8yj2g706"]
+[gd_resource type="TileSet" format=3 uid="uid://c70jv8yj2g706"]
 
-[ext_resource type="Texture2D" uid="uid://bdmjumyjb8lcp" path="res://ElvGames/Rogue Adventure/Tilesets/Sprites/RA_Ruins.png" id="1_qxasb"]
+[ext_resource type="Texture2D" uid="uid://bdmjumyjb8lcp" path="res://scripts/player/ElvGames/Rogue Adventure/Tilesets/Sprites/RA_Ruins.png" id="1_qxasb"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_whgpt"]
 texture = ExtResource("1_qxasb")
